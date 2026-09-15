@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inside a 45W charger — a hands-on guide to fast charging</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bench:#EDEFEA;
+  --panel:#FFFFFF;
+  --ink:#151B1C;
+  --ink-2:#4A5553;
+  --ink-3:#7C8785;
+  --mask:#1E6B4A;
+  --mask-soft:#E3EEE8;
+  --copper:#A9682A;
+  --copper-soft:#F5EADC;
+  --signal:#2A5FA8;
+  --signal-soft:#E3EAF5;
+  --hot:#A8382B;
+  --hot-soft:#F7E6E3;
+  --rule:#D5D9D2;
+  --rule-2:#BFC5BD;
+  --scope-bg:#101715;
+  --scope-grid:#1E2C28;
+  --scope-trace:#5FD9A4;
+  --r:4px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:24px}
+body{
+  margin:0;background:var(--bench);color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,sans-serif;font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}*{animation-duration:.01ms !important;transition-duration:.01ms !important}}
+a{color:var(--signal)}
+:focus-visible{outline:2px solid var(--signal);outline-offset:2px;border-radius:2px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.shell{display:grid;grid-template-columns:248px minmax(0,1fr);gap:0;max-width:1240px;margin:0 auto}
+.rail{
+  position:sticky;top:0;align-self:start;height:100vh;overflow-y:auto;
+  padding:28px 20px 40px;border-right:1px solid var(--rule);background:var(--bench);
+}
+.brand{font-weight:600;font-size:15px;letter-spacing:-.01em;line-height:1.3;margin:0 0 4px}
+.brand span{display:block;color:var(--ink-3);font-weight:400;font-size:13px}
+.prog{margin:18px 0 22px}
+.prog-bar{height:3px;background:var(--rule);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;width:0;background:var(--mask);transition:width .4s ease}
+.prog-txt{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3);margin-top:6px}
+.rail ol{list-style:none;margin:0;padding:0;counter-reset:n}
+.rail li{counter-increment:n}
+.rail a.nav{
+  display:flex;gap:10px;align-items:baseline;padding:7px 8px;border-radius:var(--r);
+  text-decoration:none;color:var(--ink-2);font-size:14px;line-height:1.35;border-left:2px solid transparent;
+}
+.rail a.nav::before{content:counter(n,decimal-leading-zero);font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-3);flex:none}
+.rail a.nav:hover{background:var(--panel);color:var(--ink)}
+.rail a.nav.on{background:var(--panel);color:var(--ink);border-left-color:var(--mask);font-weight:500}
+.rail a.nav.done::after{content:"✓";margin-left:auto;color:var(--mask);font-size:12px}
+
+main{padding:40px 44px 96px;min-width:0}
+section{padding:0 0 64px;scroll-margin-top:24px}
+h1{font-size:40px;line-height:1.1;letter-spacing:-.02em;font-weight:600;margin:0 0 16px;max-width:17ch}
+h2{font-size:26px;line-height:1.2;letter-spacing:-.015em;font-weight:600;margin:0 0 6px}
+h3{font-size:17px;font-weight:600;margin:28px 0 8px}
+h4{font-size:14px;font-weight:600;margin:0 0 6px}
+.kicker{font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--mask);margin:0 0 10px}
+.lede,.prose p,.prose li{font-family:"IBM Plex Serif",Georgia,serif;font-size:16.5px;line-height:1.72}
+.lede{font-size:19px;line-height:1.6;color:var(--ink-2);max-width:66ch;margin:0 0 28px}
+.prose{max-width:68ch}
+.prose p{margin:0 0 14px}
+.prose ul{margin:0 0 14px;padding-left:20px}
+.prose li{margin-bottom:6px}
+.prose strong{font-weight:600}
+code,.mono{font-family:"IBM Plex Mono",monospace;font-size:.88em}
+.sec-head{border-top:1px solid var(--rule-2);padding-top:14px;margin-bottom:22px}
+.sec-head p{color:var(--ink-2);margin:6px 0 0;max-width:62ch;font-family:"IBM Plex Serif",serif}
+
+.card{background:var(--panel);border:1px solid var(--rule);border-radius:var(--r);padding:20px 22px}
+.tool{background:var(--panel);border:1px solid var(--rule-2);border-radius:var(--r);padding:18px 20px;margin:22px 0}
+.tool-hd{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.tool-hd h4{margin:0;font-size:13px;color:var(--ink-2);font-family:"IBM Plex Mono",monospace;font-weight:400}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+
+button{
+  font:inherit;font-size:13.5px;background:var(--panel);color:var(--ink);
+  border:1px solid var(--rule-2);border-radius:var(--r);padding:7px 13px;cursor:pointer;
+  transition:background .15s,border-color .15s;
+}
+button:hover{background:var(--bench);border-color:var(--ink-3)}
+button:active{transform:translateY(1px)}
+button.pri{background:var(--mask);border-color:var(--mask);color:#fff}
+button.pri:hover{background:#17553a}
+button[disabled]{opacity:.45;cursor:not-allowed}
+button.chip{padding:5px 11px;font-size:12.5px;border-radius:999px}
+button.chip.on{background:var(--ink);border-color:var(--ink);color:#fff}
+input[type=range]{width:100%;accent-color:var(--mask)}
+label.fld{display:block;font-size:12px;color:var(--ink-3);margin-bottom:4px}
+.val{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--ink)}
+
+.metric{background:var(--bench);border-radius:var(--r);padding:10px 12px}
+.metric .k{font-size:11px;color:var(--ink-3);font-family:"IBM Plex Mono",monospace}
+.metric .v{font-family:"IBM Plex Mono",monospace;font-size:20px;font-weight:500;line-height:1.3}
+
+.note{border-left:2px solid var(--copper);background:var(--copper-soft);padding:12px 16px;border-radius:0;margin:20px 0;max-width:68ch}
+.note p{margin:0;font-family:"IBM Plex Serif",serif;font-size:15.5px}
+.warn{border-left-color:var(--hot);background:var(--hot-soft)}
+
+table{border-collapse:collapse;width:100%;font-size:14px;margin:12px 0}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule)}
+th{font-weight:600;font-size:12.5px;color:var(--ink-2)}
+td.num{font-family:"IBM Plex Mono",monospace}
+
+#scope{display:block;width:100%;height:190px;background:var(--scope-bg);border-radius:var(--r)}
+.stage-row{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.stage{
+  flex:1 1 92px;background:var(--bench);border:1px solid var(--rule);border-radius:var(--r);
+  padding:8px 9px;cursor:pointer;text-align:left;font-size:12px;line-height:1.3;min-width:92px;
+}
+.stage:hover{border-color:var(--ink-3)}
+.stage.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.stage .n{font-family:"IBM Plex Mono",monospace;font-size:10px;opacity:.6;display:block}
+.stage.hv{border-top:2px solid var(--hot)}
+.stage.lv{border-top:2px solid var(--mask)}
+.readout{display:flex;gap:18px;flex-wrap:wrap;font-family:"IBM Plex Mono",monospace;font-size:12px;color:var(--ink-2);margin-top:10px}
+.readout b{color:var(--ink);font-weight:500}
+
+.log{background:var(--scope-bg);border-radius:var(--r);padding:12px 14px;font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.75;height:230px;overflow-y:auto;color:#9FB8AE}
+.log .t{color:#4E6A62}
+.log .dev{color:#7FB7F0}
+.log .chg{color:#7FD9A8}
+.log .ok{color:#F0C46A}
+
+#stage3d{width:100%;height:380px;background:var(--scope-bg);border-radius:var(--r);overflow:hidden;position:relative}
+#stage3d .fallback{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#7C8785;font-size:14px;padding:20px;text-align:center}
+
+.q{border-top:1px solid var(--rule);padding:18px 0}
+.q:first-of-type{border-top:none}
+.q p.qt{font-weight:500;margin:0 0 10px;font-size:15.5px}
+.opt{display:block;width:100%;text-align:left;margin-bottom:6px;padding:9px 12px;font-size:14px}
+.opt.right{background:var(--mask-soft);border-color:var(--mask)}
+.opt.wrong{background:var(--hot-soft);border-color:var(--hot)}
+.exp{font-family:"IBM Plex Serif",serif;font-size:14.5px;color:var(--ink-2);margin:8px 0 0;padding-left:12px;border-left:2px solid var(--rule-2)}
+.gloss dt{font-weight:600;font-size:14.5px;margin-top:14px}
+.gloss dd{margin:2px 0 0;font-family:"IBM Plex Serif",serif;font-size:15px;color:var(--ink-2)}
+
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .rail{position:static;height:auto;border-right:none;border-bottom:1px solid var(--rule);padding:18px 20px}
+  .rail ol{display:flex;flex-wrap:wrap;gap:4px}
+  .rail a.nav{border-left:none;border-bottom:2px solid transparent;padding:6px 9px}
+  .rail a.nav.on{border-left:none;border-bottom-color:var(--mask)}
+  main{padding:26px 20px 70px}
+  h1{font-size:30px}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+<nav class="rail" aria-label="Chapters">
+  <p class="brand">Inside a 45W charger<span>An interactive teardown</span></p>
+  <div class="prog">
+    <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+    <p class="prog-txt" id="progTxt">0 of 9 read</p>
+  </div>
+  <ol id="navList"></ol>
+</nav>
+<main>
+
+<section id="intro">
+  <p class="kicker">45 W · USB-C PD 3.1 · GaN</p>
+  <h1>A charger is a power plant that fits in your pocket</h1>
+  <p class="lede">It takes 220 volts of alternating current, rips it apart a few hundred thousand times a second, rebuilds it as whatever voltage your phone asks for, and does all of it without letting the mains anywhere near your hand. This guide takes one apart — stage by stage, with working instruments.</p>
+  <div class="grid3" style="max-width:640px">
+    <div class="metric"><div class="k">input</div><div class="v">220 V<span style="font-size:13px;color:var(--ink-3)"> ac</span></div></div>
+    <div class="metric"><div class="k">output</div><div class="v">3.3–21 V<span style="font-size:13px;color:var(--ink-3)"> dc</span></div></div>
+    <div class="metric"><div class="k">switching</div><div class="v">~300 kHz</div></div>
+  </div>
+  <p class="prose" style="margin-top:24px">Work through the chapters in order, or jump to whichever instrument interests you. Everything here is interactive — sliders, simulations, and a board you can rotate.</p>
+</section>
+
+<section id="why">
+  <div class="sec-head"><p class="kicker">Chapter 1</p><h2>Why fast charging is hard</h2>
+  <p>Power is voltage times current. There are only two ways to push more watts into a phone, and both of them cause problems.</p></div>
+  <div class="prose">
+    <p>Old chargers delivered 5 volts at 1 amp — five watts. To reach 45 watts you either raise the current or raise the voltage.</p>
+    <p><strong>Raising current is expensive.</strong> Resistive loss in a cable goes up with the <em>square</em> of current: <code>P_loss = I² × R</code>. Double the current and you quadruple the heat in the cable, the connector pins, and the phone's internal traces. At 9 amps a USB-C cable would need copper thick enough to be uncomfortable to coil.</p>
+    <p><strong>Raising voltage is cheap</strong> — but a lithium cell only wants about 3.7–4.45 volts. Anything higher has to be stepped back down inside the phone, and every conversion stage loses a percentage as heat, right next to a battery that hates being warm.</p>
+    <p>Modern fast charging threads this needle: deliver a <em>moderately</em> high voltage over the cable to keep current low, then convert it efficiently inside the phone — or skip the conversion entirely by matching the charger output to the battery voltage directly. Drag the slider to see the trade-off.</p>
+  </div>
+
+  <div class="tool">
+    <div class="tool-hd"><h4>cable loss calculator · 45 W delivered</h4></div>
+    <label class="fld" for="vSel">Delivery voltage — <span class="val" id="vOut">20 V</span></label>
+    <input type="range" id="vSel" min="0" max="4" step="1" value="4">
+    <div class="grid3" style="margin-top:14px">
+      <div class="metric"><div class="k">current</div><div class="v" id="mI">2.25 A</div></div>
+      <div class="metric"><div class="k">cable loss</div><div class="v" id="mLoss">0.4 W</div></div>
+      <div class="metric"><div class="k">efficiency</div><div class="v" id="mEff">99.2 %</div></div>
+    </div>
+    <p style="font-size:13px;color:var(--ink-3);margin:12px 0 0">Assumes 1 m of USB-C at roughly 80 mΩ round-trip conductor resistance.</p>
+  </div>
+
+  <div class="note"><p>This is the same reason national grids run at hundreds of kilovolts and step down near your house. A charger is that idea compressed into 40 grams.</p></div>
+</section>
+
+<section id="path">
+  <div class="sec-head"><p class="kicker">Chapter 2</p><h2>The power path, with a scope on it</h2>
+  <p>Nine stages sit between the wall and your phone. Select one to see what the waveform looks like at that point on the board.</p></div>
+
+  <div class="tool">
+    <div class="tool-hd"><h4 id="scopeTitle">stage 1 · ac mains input</h4>
+      <div><button class="chip" id="freezeBtn">Freeze</button></div>
+    </div>
+    <div class="stage-row" id="stageRow"></div>
+    <canvas id="scope" width="900" height="380" aria-label="Oscilloscope trace for the selected stage"></canvas>
+    <div class="readout" id="scopeRead"></div>
+    <div id="stageDesc" class="prose" style="margin-top:14px;font-size:15.5px"></div>
+  </div>
+
+  <div class="note warn"><p>Stages 1 through 6 sit on the primary side and can hold 300-plus volts on the bulk capacitor for minutes after unplugging. A charger is not a beginner's teardown project.</p></div>
+</section>
+
+<section id="flyback">
+  <div class="sec-head"><p class="kicker">Chapter 3</p><h2>The flyback: storing energy in a magnet</h2>
+  <p>Almost every charger under about 65 watts uses the same topology. It works in two beats.</p></div>
+  <div class="prose">
+    <p>The transformer in a charger is not really a transformer in the textbook sense — it is a pair of coupled inductors used as an energy bucket. Here is the cycle, repeated a few hundred thousand times a second:</p>
+    <p><strong>Beat one — switch on.</strong> The GaN transistor connects the primary winding across the 300 V bus. Current ramps up through the winding, storing energy in the magnetic field of the ferrite core. The secondary diode is reverse-biased, so nothing comes out yet. Energy goes in, nothing comes out.</p>
+    <p><strong>Beat two — switch off.</strong> The transistor opens. The collapsing magnetic field reverses the voltage across the windings, the secondary side now conducts, and the stored energy dumps into the output capacitor. Nothing goes in, energy comes out.</p>
+    <p>The ratio of on-time to off-time — the duty cycle — decides how much energy moves per cycle, and therefore the output voltage. That is the single knob the controller turns.</p>
+  </div>
+
+  <div class="tool">
+    <div class="tool-hd"><h4>flyback cycle · step through the two beats</h4>
+      <div><button id="fbPrev">Previous</button> <button id="fbNext" class="pri">Next beat</button></div>
+    </div>
+    <div id="fbSvg"></div>
+    <p id="fbCap" class="prose" style="font-size:15.5px;margin:12px 0 0"></p>
+  </div>
+
+  <div class="note"><p>Because energy only crosses the barrier as a magnetic field, there is no conductive path from mains to output. This isolation is the entire reason you can hold a charging phone in the bath-adjacent real world without dying — and the reason counterfeit chargers that skimp on transformer insulation are genuinely lethal.</p></div>
+</section>
+
+
+<section id="control">
+  <div class="sec-head"><p class="kicker">Chapter 4</p><h2>The control loop: how it knows what to do</h2>
+  <p>Chopping the bus is easy. Chopping it by exactly the right amount, thousands of times a second, while the load jumps around, is the actual engineering.</p></div>
+  <div class="prose">
+    <p>For an ideal flyback, output voltage follows a single equation:</p>
+    <p style="font-family:'IBM Plex Mono',monospace;font-size:15px;background:var(--bench);padding:10px 14px;border-radius:4px;display:inline-block">V_out = V_in × (D / (1 − D)) × (N_s / N_p)</p>
+    <p>where <code>D</code> is duty cycle — the fraction of each period the switch is on — and <code>N_s/N_p</code> is the turns ratio. The turns ratio is fixed when the transformer is wound. The bus voltage wanders with the mains. So duty cycle is the only thing left to adjust, and it is adjusted every single cycle.</p>
+    <h3>Continuous versus discontinuous mode</h3>
+    <p>If the core fully empties before the next switch-on, the converter is in <strong>discontinuous conduction mode</strong>. If current is still flowing when the next cycle begins, it is <strong>continuous</strong>. DCM gives easier control and lets the secondary device turn on at zero current; CCM moves more power through the same core but stresses components with higher peak-to-average currents. Chargers usually sit in DCM at light load and slide toward CCM near full load, and the controller has to stay stable across that transition.</p>
+    <h3>Valley switching</h3>
+    <p>After the core empties in DCM, the drain voltage rings. Turning the transistor back on at the bottom of one of those rings — the valley — means switching across the smallest possible voltage, which cuts the energy lost per transition. This is why the switching frequency of a real charger is not a fixed number: it drifts as the controller hunts for valleys under changing load. Hearing a faint chirp from a charger under varying load is often this frequency wandering through the audible band.</p>
+    <h3>Closing the loop across an isolation barrier</h3>
+    <p>The primary controller cannot measure the output directly — there is no wire. A shunt reference on the secondary side compares the output against an internal 2.5 V reference and sinks current through an optocoupler LED in proportion to the error. The phototransistor on the primary side reports that error, and the controller adjusts duty cycle to null it.</p>
+    <p>That loop has a speed limit. Make it too slow and a sudden load step causes a deep voltage dip before correction arrives. Make it too fast and the loop overshoots, rings, and can oscillate outright. The compensation network — usually one resistor and one capacitor next to the shunt reference — is what sets the balance.</p>
+  </div>
+
+  <div class="tool">
+    <div class="tool-hd"><h4>flyback transfer function</h4></div>
+    <div class="grid2">
+      <div>
+        <label class="fld" for="dSel">Duty cycle — <span class="val" id="dOut">0.42</span></label>
+        <input type="range" id="dSel" min="10" max="70" step="1" value="42">
+        <label class="fld" for="nSel" style="margin-top:12px">Turns ratio N_s : N_p — <span class="val" id="nOut">1 : 6</span></label>
+        <input type="range" id="nSel" min="3" max="12" step="1" value="6">
+      </div>
+      <div class="grid3" style="grid-template-columns:1fr 1fr">
+        <div class="metric"><div class="k">bus voltage</div><div class="v">300 V</div></div>
+        <div class="metric"><div class="k">output</div><div class="v" id="dVout">36.2 V</div></div>
+        <div class="metric"><div class="k">mode</div><div class="v" id="dMode" style="font-size:15px">DCM</div></div>
+        <div class="metric"><div class="k">peak switch stress</div><div class="v" id="dStress" style="font-size:15px">moderate</div></div>
+      </div>
+    </div>
+    <p id="dNote" style="font-size:13.5px;color:var(--ink-2);margin:12px 0 0"></p>
+  </div>
+
+  <div class="tool">
+    <div class="tool-hd"><h4>transient response · load step 0.5 A → 2.5 A</h4>
+      <div><button class="pri" id="loopStep">Apply load step</button></div>
+    </div>
+    <label class="fld" for="bwSel">Loop bandwidth — <span class="val" id="bwOut">6 kHz</span></label>
+    <input type="range" id="bwSel" min="1" max="20" step="1" value="6">
+    <canvas id="loopCv" width="900" height="260" style="width:100%;height:170px;background:var(--panel);border:1px solid var(--rule);border-radius:4px;margin-top:12px" aria-label="Output voltage response to a load step"></canvas>
+    <div class="grid3" style="margin-top:10px">
+      <div class="metric"><div class="k">undershoot</div><div class="v" id="lUnder">— mV</div></div>
+      <div class="metric"><div class="k">recovery</div><div class="v" id="lRec">— µs</div></div>
+      <div class="metric"><div class="k">verdict</div><div class="v" id="lVerd" style="font-size:15px">—</div></div>
+    </div>
+    <p style="font-size:13px;color:var(--ink-3);margin-top:10px">Output capacitance alone carries the load for the first few microseconds. Everything after that is the loop doing its job — or overdoing it.</p>
+  </div>
+</section>
+
+<section id="gan">
+  <div class="sec-head"><p class="kicker">Chapter 5</p><h2>Why GaN made chargers shrink</h2>
+  <p>The size of a charger is set almost entirely by its transformer, and the size of the transformer is set by how fast you can switch.</p></div>
+  <div class="prose">
+    <p>Each switching cycle moves one packet of energy. If you switch twice as often, each packet can be half as big — which means a smaller core, fewer turns of wire, and a smaller capacitor to smooth the result. So designers want the highest switching frequency they can get.</p>
+    <p>The limit is loss. Every time a transistor turns on or off it spends a moment in the resistive middle ground, dissipating heat. Silicon MOSFETs take relatively long to make that transition and carry a chunk of gate charge that must be shovelled in and out each cycle. Push a silicon design past roughly 100–150 kHz and switching loss eats the gains.</p>
+    <p><strong>Gallium nitride</strong> transistors have much lower gate charge and far lower output capacitance, so they cross that resistive middle ground faster. Same power, less loss per transition, which unlocks 300 kHz to over 1 MHz. Slide the frequency to see what it does to the magnetics.</p>
+  </div>
+
+  <div class="tool">
+    <div class="tool-hd"><h4>switching frequency vs. transformer volume</h4></div>
+    <label class="fld" for="fSel">Switching frequency — <span class="val" id="fOut">300 kHz</span></label>
+    <input type="range" id="fSel" min="50" max="1000" step="10" value="300">
+    <div class="grid2" style="margin-top:16px;align-items:center">
+      <div id="coreBox" style="display:flex;align-items:flex-end;justify-content:center;height:150px;background:var(--bench);border-radius:var(--r)"></div>
+      <div>
+        <div class="grid3" style="grid-template-columns:1fr 1fr">
+          <div class="metric"><div class="k">core volume</div><div class="v" id="mCore">100 %</div></div>
+          <div class="metric"><div class="k">device</div><div class="v" id="mTech" style="font-size:15px">GaN</div></div>
+        </div>
+        <p id="fNote" style="font-size:13.5px;color:var(--ink-2);margin:12px 0 0"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<section id="losses">
+  <div class="sec-head"><p class="kicker">Chapter 6</p><h2>Where the missing watts go</h2>
+  <p>A 45 W charger pulls about 48 W from the wall. Those three extra watts are not one thing — they are five things that trade against each other.</p></div>
+  <div class="prose">
+    <p><strong>Conduction loss</strong> is current squared times resistance, in the switch channel, the windings, and the PCB copper. It grows with the square of load, so it dominates at full power and nearly vanishes at light load.</p>
+    <p><strong>Switching loss</strong> is paid per transition, not per watt. It is roughly constant with load and scales with frequency — which is precisely the tension in chapter 5: higher frequency shrinks the magnetics but multiplies this term. Soft switching techniques like valley switching exist to attack it.</p>
+    <p><strong>Core loss</strong> comes from hysteresis and eddy currents in the ferrite, growing with frequency and flux swing. <strong>Rectification loss</strong> is what the synchronous MOSFET still drops. And the <strong>controller</strong> itself needs a few tens of milliwatts just to exist.</p>
+    <p>Notice what happens at light load in the tool below. Because switching loss is load-independent, efficiency collapses at low output unless the controller does something about it — which is why it switches to <strong>burst mode</strong>, firing a short cluster of pulses then sleeping. That is also how a modern charger meets no-load regulations measured in tens of milliwatts.</p>
+  </div>
+
+  <div class="tool">
+    <div class="tool-hd"><h4>loss budget · drag the load</h4>
+      <div><label style="font-size:13px;color:var(--ink-2);display:flex;gap:6px;align-items:center"><input type="checkbox" id="burstOn" checked> Burst mode at light load</label></div>
+    </div>
+    <label class="fld" for="loadSel">Output power — <span class="val" id="loadOut">45.0 W</span></label>
+    <input type="range" id="loadSel" min="0" max="450" step="5" value="450">
+    <div id="lossBars" style="margin-top:16px"></div>
+    <div class="grid3" style="margin-top:12px">
+      <div class="metric"><div class="k">total loss</div><div class="v" id="lossTot">— W</div></div>
+      <div class="metric"><div class="k">efficiency</div><div class="v" id="lossEff">— %</div></div>
+      <div class="metric"><div class="k">case temp rise</div><div class="v" id="lossT">— K</div></div>
+    </div>
+    <canvas id="effCv" width="900" height="260" style="width:100%;height:170px;background:var(--panel);border:1px solid var(--rule);border-radius:4px;margin-top:14px" aria-label="Efficiency versus output power curve"></canvas>
+    <p style="font-size:13px;color:var(--ink-3);margin-top:8px">Curve shows efficiency across the full load range; the marker follows the slider. Regulators specify efficiency as an average of four load points — 25, 50, 75 and 100 % — precisely so designers cannot optimise for one.</p>
+  </div>
+
+  <div class="prose">
+    <h3>The EMI tax</h3>
+    <p>Every one of those fast transitions is also a radio transmitter. A 300 kHz square wave with nanosecond edges carries harmonic energy well into the tens of megahertz, and conducted emission limits apply from 150 kHz upward. GaN makes this harder, not easier: faster edges mean more high-frequency content.</p>
+    <p>Designers fight back with the common-mode choke, X and Y capacitors, careful loop-area minimisation on the PCB, sometimes a shield winding in the transformer, and occasionally deliberate frequency dithering to spread the spectrum rather than concentrate it in narrow spikes. A charger that passes emissions with 6 dB of margin represents real layout work — and is exactly what a counterfeit deletes.</p>
+  </div>
+</section>
+
+<section id="pd">
+  <div class="sec-head"><p class="kicker">Chapter 7</p><h2>The negotiation, message by message</h2>
+  <p>Before a single extra watt flows, the charger and the phone hold a conversation on the CC pin. Run it and watch.</p></div>
+  <div class="prose">
+    <p>A USB-C port starts at a safe 5 volts, always. The charger advertises what it can do; the device picks one profile and asks for it; the charger confirms, switches its output, and only then tells the device the new voltage is ready. Nothing is assumed — if either side goes quiet, the link falls back to 5 V.</p>
+    <p>The messages are sent using biphase-mark-coded packets on the CC line at about 300 kbit/s, with CRC checks and mandatory acknowledgements. Pick a device and plug it in.</p>
+  </div>
+
+  <div class="tool">
+    <div class="tool-hd"><h4>usb power delivery handshake simulator</h4>
+      <div id="devPick"></div>
+    </div>
+    <div class="grid2" style="align-items:start">
+      <div class="log" id="pdLog" role="log" aria-live="polite"></div>
+      <div>
+        <div class="grid3" style="grid-template-columns:1fr 1fr">
+          <div class="metric"><div class="k">vbus</div><div class="v" id="pdV">5.00 V</div></div>
+          <div class="metric"><div class="k">current limit</div><div class="v" id="pdI">0.50 A</div></div>
+          <div class="metric"><div class="k">power</div><div class="v" id="pdP">2.5 W</div></div>
+          <div class="metric"><div class="k">state</div><div class="v" id="pdS" style="font-size:14px">unplugged</div></div>
+        </div>
+        <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="pri" id="pdRun">Plug in</button>
+          <button id="pdReset">Unplug</button>
+        </div>
+        <p style="font-size:13px;color:var(--ink-3);margin-top:12px">Source capabilities are re-advertised every time the port is attached, and either side may renegotiate at any moment.</p>
+      </div>
+    </div>
+  </div>
+
+  <h3>What a 45 W charger actually advertises</h3>
+  <table>
+    <thead><tr><th>Profile</th><th>Voltage</th><th>Max current</th><th>Watts</th><th>Typical use</th></tr></thead>
+    <tbody>
+      <tr><td>Fixed PDO 1</td><td class="num">5 V</td><td class="num">3.0 A</td><td class="num">15</td><td>Legacy devices, accessories</td></tr>
+      <tr><td>Fixed PDO 2</td><td class="num">9 V</td><td class="num">3.0 A</td><td class="num">27</td><td>Most phones</td></tr>
+      <tr><td>Fixed PDO 3</td><td class="num">15 V</td><td class="num">3.0 A</td><td class="num">45</td><td>Tablets, fast phone charging</td></tr>
+      <tr><td>Fixed PDO 4</td><td class="num">20 V</td><td class="num">2.25 A</td><td class="num">45</td><td>Laptops</td></tr>
+      <tr><td>APDO (PPS)</td><td class="num">3.3–11 V</td><td class="num">4.05 A</td><td class="num">45</td><td>Direct-charge phones</td></tr>
+    </tbody>
+  </table>
+  <p class="prose"><strong>PPS is the interesting row.</strong> Instead of fixed steps it gives the phone a continuously adjustable output in 20 mV increments, updated every few seconds. That lets the phone ask for a voltage just barely above its battery voltage and feed the cells almost directly — skipping a lossy internal conversion stage. It is why a PPS-capable 45 W charger can outperform a non-PPS 65 W one on the same phone.</p>
+</section>
+
+
+<section id="pps">
+  <div class="sec-head"><p class="kicker">Chapter 8</p><h2>PPS and direct charging</h2>
+  <p>The most consequential change in fast charging was not more watts. It was letting the phone move the charger's output voltage continuously.</p></div>
+  <div class="prose">
+    <p>Under fixed PDO charging the charger sends, say, 9 V. The battery wants 3.9 V. Something inside the phone has to bridge that gap, and that something is a buck converter running at perhaps 89 % efficiency. At 30 W delivered that is over three watts of heat generated <em>inside the phone</em>, millimetres from the cell it is trying to fill.</p>
+    <p><strong>PPS changes the arrangement.</strong> An Augmented PDO advertises a continuous range — commonly 3.3 to 11 V in 20 mV steps, with current adjustable in 50 mA steps. The phone measures its own cell, calculates the voltage it needs, and asks for exactly that. It must re-request at least every ten seconds or the contract expires and the port drops back to 5 V, which is a deliberate safety interlock.</p>
+    <h3>The charge pump trick</h3>
+    <p>Direct charging goes further. Instead of a buck converter, the phone uses a <strong>2:1 switched-capacitor charge pump</strong>: capacitors are shuffled between two configurations, halving the input voltage and doubling the current. Because it never stores energy in an inductor and the switches see only half the voltage, it reaches 97–98 % efficiency.</p>
+    <p>The catch is that it only divides by exactly two. The charger must therefore supply almost precisely twice the cell voltage — around 7.4 V at 3.7 V per cell, drifting to 8.9 V as the cell fills. Only PPS can track that. Divide-by-four pumps exist for higher-voltage packs, with the same constraint at four times the cell voltage.</p>
+    <p>Drag the state of charge below and compare what each architecture does with the same charger.</p>
+  </div>
+
+  <div class="tool">
+    <div class="tool-hd"><h4>direct charge vs fixed pdo · single-cell 5000 mAh</h4>
+      <div><button class="chip" id="ppsAuto">Animate fill</button></div>
+    </div>
+    <label class="fld" for="socSel">State of charge — <span class="val" id="socOut">20 %</span></label>
+    <input type="range" id="socSel" min="0" max="100" step="1" value="20">
+    <div class="grid3" style="grid-template-columns:1fr 1fr;margin-top:12px">
+      <div class="metric"><div class="k">cell voltage</div><div class="v" id="ppsVc">3.62 V</div></div>
+      <div class="metric"><div class="k">pps request (20 mV steps)</div><div class="v" id="ppsVb">7.48 V</div></div>
+    </div>
+    <div id="ppsCards" class="grid3" style="grid-template-columns:repeat(auto-fit,minmax(200px,1fr));margin-top:14px"></div>
+    <p id="ppsNote" style="font-size:13.5px;color:var(--ink-2);margin:14px 0 0"></p>
+  </div>
+
+  <h3>What the CC pin is doing underneath</h3>
+  <div class="prose">
+    <p>Before any of this, the two CC pins settle three questions at once. The sink pulls each CC line down through a 5.1 kΩ resistor to ground (Rd); the source pulls up through a resistor or current source (Rp). Whichever CC line shows the pull-down tells the source which way round the plug is inserted — that is how a reversible connector works with no moving parts.</p>
+    <p>The <em>value</em> of the source's pull-up encodes the legacy current limit before any PD messages are exchanged: roughly 0.5 A, 1.5 A, or 3.0 A. A device that speaks no PD at all still gets a safe, meaningful answer. Only then do PD packets begin, biphase-mark-coded onto the same line at about 300 kbit/s.</p>
+    <h3>Why the cable has a chip in it</h3>
+    <p>Above 3 A the cable itself must identify as capable. An <strong>e-marker</strong> chip in the plug answers a Discover_Identity query over the second CC line, declaring rated current, voltage, and speed. No e-marker means the contract is capped at 3 A regardless of what the charger or phone can do — which is why a 45 W charger and a capable phone can still underperform on a cheap cable, and the phone will not tell you why.</p>
+    <p>PD 3.1 extends the range further with <strong>Extended Power Range</strong>: 28, 36 and 48 V fixed profiles up to 240 W, gated behind mandatory e-marked cables and additional voltage-safety checks. Those higher rails never appear on a port until both ends have proven they can handle them.</p>
+  </div>
+</section>
+
+<section id="battery">
+  <div class="sec-head"><p class="kicker">Chapter 9</p><h2>Run a charge cycle</h2>
+  <p>Watts are not the whole story. Watch what the battery actually accepts over time, and where the heat goes.</p></div>
+  <div class="prose">
+    <p>Lithium cells charge in two phases. In <strong>constant current</strong>, the charger pushes the maximum safe current and the cell voltage climbs steadily. Once the cell reaches its termination voltage, the charger switches to <strong>constant voltage</strong>: it holds that voltage fixed and current tapers away as the cell fills. The taper is physics, not conservatism — forcing more current at full charge plates lithium metal onto the anode and permanently damages the cell.</p>
+    <p>This is why the marketing number only describes the first half of the curve. Run the simulation at different wattages and watch how little the last 20 % changes.</p>
+  </div>
+
+  <div class="tool">
+    <div class="tool-hd"><h4>charge simulation · 5000 mAh dual-cell phone</h4>
+      <div id="wPick"></div>
+    </div>
+    <canvas id="chg" width="900" height="330" style="width:100%;height:210px;background:var(--panel);border:1px solid var(--rule);border-radius:var(--r)" aria-label="Charging curve showing state of charge, power and temperature over time"></canvas>
+    <div class="grid3" style="margin-top:12px">
+      <div class="metric"><div class="k">charge</div><div class="v" id="cSoc">0 %</div></div>
+      <div class="metric"><div class="k">delivered</div><div class="v" id="cPow">0 W</div></div>
+      <div class="metric"><div class="k">battery temp</div><div class="v" id="cTmp">26 °C</div></div>
+      <div class="metric"><div class="k">elapsed</div><div class="v" id="cTim">0:00</div></div>
+    </div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="pri" id="cRun">Start charging</button>
+      <button id="cReset">Reset</button>
+      <label style="font-size:13px;color:var(--ink-2);display:flex;gap:6px;align-items:center;margin-left:4px">
+        <input type="checkbox" id="cHot"> Warm room (32 °C) and a thick case
+      </label>
+    </div>
+    <div class="readout" style="margin-top:10px"><span>Legend — <b style="color:var(--mask)">charge %</b> · <b style="color:var(--signal)">watts in</b> · <b style="color:var(--hot)">cell temperature</b></span></div>
+  </div>
+
+  <div class="note"><p>Notice the thermal throttle. When the cell passes about 42 °C the phone renegotiates down to protect the battery, and total charge time barely improves even though the charger still has headroom. Heat, not the charger's rating, is usually the real limit.</p></div>
+</section>
+
+<section id="board">
+  <div class="sec-head"><p class="kicker">Chapter 10</p><h2>The board itself</h2>
+  <p>A representative 45 W GaN layout with silkscreen, copper and part markings. Drag to rotate, scroll to zoom, click any component.</p></div>
+  <div class="tool">
+    <div class="tool-hd"><h4>3d board tour</h4>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="chip" id="vIso">Isometric</button>
+        <button class="chip" id="vTop">Top</button>
+        <button class="chip" id="vSide">Side</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+      <button class="chip on" id="tLab">Labels</button>
+      <button class="chip" id="tZone">Zone colours</button>
+      <button class="chip" id="tFlow">Power flow</button>
+      <button class="chip" id="bExp">Explode</button>
+    </div>
+    <div id="stage3d"><div class="fallback" id="b3dFall">Loading 3D viewer…</div></div>
+    <div class="grid2" style="margin-top:12px">
+      <div class="card" style="padding:14px 16px">
+        <h4 id="b3dName">Select a component</h4>
+        <p id="b3dSpec" class="mono" style="color:var(--ink-3);margin:0 0 6px;font-size:12px"></p>
+        <p id="b3dDesc" style="font-family:'IBM Plex Serif',serif;font-size:14.5px;color:var(--ink-2);margin:0">Rotate the board and click a part to read what it does, what it is rated for, and what happens if it is undersized.</p>
+      </div>
+      <div style="font-size:12.5px;color:var(--ink-2);line-height:2">
+        <span style="display:inline-block;width:10px;height:10px;background:#A8382B;border-radius:2px;margin-right:6px"></span>Primary — mains potential<br>
+        <span style="display:inline-block;width:10px;height:10px;background:#A9682A;border-radius:2px;margin-right:6px"></span>Switching stage<br>
+        <span style="display:inline-block;width:10px;height:10px;background:#1E6B4A;border-radius:2px;margin-right:6px"></span>Secondary — safe to touch<br>
+        <span style="display:inline-block;width:10px;height:10px;background:#2A5FA8;border-radius:2px;margin-right:6px"></span>Control and sensing
+      </div>
+    </div>
+  </div>
+  <div class="prose">
+    <p>Three details are worth staring at. The <strong>routed slot</strong> across the middle is the isolation barrier — a physical gap enforcing the creepage distance safety standards demand between mains-connected copper and anything a user can reach. Only the transformer and the optocoupler cross it, and both do so without a conductive path.</p>
+    <p><strong>Height</strong> is set by the bulk capacitor and the transformer. Every generation of shrinkage traces back to making one of those two smaller, which is the whole story of chapter 5.</p>
+    <p><strong>Loop area</strong> is invisible but decides whether the board passes emissions. The path from bulk capacitor to switch to transformer and back carries the fastest current edges in the design; the physical area that loop encloses is the area of the antenna it accidentally forms. Good layouts keep it small enough to cover with a fingernail. Turn on power flow to trace it.</p>
+  </div>
+</section>
+
+<section id="safety">
+  <div class="sec-head"><p class="kicker">Chapter 11</p><h2>Efficiency, heat, and what fakes leave out</h2>
+  <p>Where the missing watts go, and which corners counterfeit chargers cut.</p></div>
+  <div class="prose">
+    <p>A good 45 W charger runs at roughly 91–94 % efficiency at full load. The missing 3–4 watts become heat, and they come from four places: conduction loss in the switch and synchronous rectifier, core and winding loss in the transformer, the forward drop of remaining diodes, and the controller's own consumption. Designers trade these against each other constantly — a bigger core cuts magnetic loss but adds cost and volume.</p>
+    <p>Standby matters too. Regulations like the EU and US external-power-supply rules cap no-load draw at well under 100 mW, so controllers drop into burst mode when nothing is attached, waking only briefly to keep the bus alive.</p>
+    <h3>What gets removed in a counterfeit</h3>
+    <ul>
+      <li><strong>Isolation distance.</strong> The routed slot disappears and primary copper runs within a millimetre of secondary. One whisker of solder or one humid day and mains voltage reaches the USB connector.</li>
+      <li><strong>The Y-capacitor and EMI filter.</strong> Cheap to omit, and their absence shows up as touchscreen jitter, audible whine, and interference with nearby radios.</li>
+      <li><strong>Transformer tape layers.</strong> Genuine transformers use multiple layers of reinforced insulation and a specified margin at the bobbin ends. Fakes use one layer.</li>
+      <li><strong>Output filtering.</strong> Undersized capacitors leave ripple on the output that the phone's own regulators then have to absorb, warming the phone.</li>
+      <li><strong>Honest negotiation.</strong> Some fakes advertise PD profiles they cannot actually sustain, then sag or shut down under load.</li>
+    </ul>
+    <p>The practical test is unglamorous: weight and certification. A real 45 W brick has real magnetics and real capacitors in it, and those things have mass. A suspiciously light charger with a printed-on certification mark is usually exactly what it looks like.</p>
+  </div>
+  <div class="note warn"><p>If a charger buzzes audibly under load, gets hot enough to be uncomfortable to hold, or makes a phone's touchscreen behave erratically while plugged in, stop using it. Each of those is a symptom of a specific missing component.</p></div>
+</section>
+
+<section id="quiz">
+  <div class="sec-head"><p class="kicker">Chapter 12</p><h2>Check yourself</h2>
+  <p>Twelve questions. Each answer explains itself.</p></div>
+  <div id="quizBox"></div>
+  <div id="quizScore" class="card" style="margin-top:18px;display:none"></div>
+</section>
+
+<section id="glossary">
+  <div class="sec-head"><p class="kicker">Reference</p><h2>Glossary</h2></div>
+  <dl class="gloss" id="glossBox"></dl>
+  <p style="font-size:13px;color:var(--ink-3);margin-top:32px;max-width:66ch">Component placement, values and waveforms in this guide are representative of a typical 45 W GaN USB-C design rather than a teardown of one specific product. Every manufacturer routes their board differently.</p>
+</section>
+
+</main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ---------- nav + progress ---------- */
+var SECTIONS=[
+ {id:'why',t:'Why it is hard'},{id:'path',t:'The power path'},{id:'flyback',t:'The flyback cycle'},
+ {id:'control',t:'The control loop'},{id:'gan',t:'Why GaN shrank it'},{id:'losses',t:'Where the watts go'},
+ {id:'pd',t:'The negotiation'},{id:'pps',t:'PPS and direct charge'},{id:'battery',t:'A charge cycle'},
+ {id:'board',t:'The board'},{id:'safety',t:'Safety and fakes'},{id:'quiz',t:'Check yourself'}
+];
+var navList=document.getElementById('navList'),seen={};
+SECTIONS.forEach(function(s){
+ var li=document.createElement('li');
+ li.innerHTML='<a class="nav" href="#'+s.id+'" data-id="'+s.id+'">'+s.t+'</a>';
+ navList.appendChild(li);
+});
+function updProg(){
+ var n=Object.keys(seen).length;
+ document.getElementById('progFill').style.width=(n/SECTIONS.length*100)+'%';
+ document.getElementById('progTxt').textContent=n+' of '+SECTIONS.length+' read';
+}
+var links={};document.querySelectorAll('a.nav').forEach(function(a){links[a.dataset.id]=a;});
+var io=new IntersectionObserver(function(es){
+ es.forEach(function(e){
+  var a=links[e.target.id];if(!a)return;
+  if(e.isIntersecting){
+   Object.values(links).forEach(function(x){x.classList.remove('on')});
+   a.classList.add('on');
+   if(e.intersectionRatio>0.25&&!seen[e.target.id]){seen[e.target.id]=1;a.classList.add('done');updProg();}
+  }
+ });
+},{rootMargin:'-20% 0px -60% 0px',threshold:[0,0.26]});
+SECTIONS.forEach(function(s){var el=document.getElementById(s.id);if(el)io.observe(el);});
+
+/* ---------- ch1 cable loss ---------- */
+var VOLTS=[5,9,12,15,20],R=0.08;
+function cable(){
+ var v=VOLTS[+document.getElementById('vSel').value],i=45/v,loss=i*i*R;
+ document.getElementById('vOut').textContent=v+' V';
+ document.getElementById('mI').textContent=i.toFixed(2)+' A';
+ document.getElementById('mLoss').textContent=loss.toFixed(2)+' W';
+ document.getElementById('mEff').textContent=(45/(45+loss)*100).toFixed(1)+' %';
+}
+document.getElementById('vSel').addEventListener('input',cable);cable();
+
+/* ---------- ch2 scope ---------- */
+var STAGES=[
+ {n:'AC mains',side:'hv',ttl:'ac mains input',v:'325 V peak',f:'50 Hz',w:'sine',
+  d:'Raw mains. A 220 V rating is the RMS value; the actual peak is about 325 V, and that is the number every component on the primary side has to survive.'},
+ {n:'EMI filter',side:'hv',ttl:'after the emi filter',v:'325 V peak',f:'50 Hz',w:'sineclean',
+  d:'A common-mode choke plus X and Y capacitors. Its job is not to change the waveform going forward but to stop the charger\'s own switching noise travelling backwards into the mains and radiating from the wall wiring.'},
+ {n:'Rectifier',side:'hv',ttl:'after the bridge rectifier',v:'325 V peak',f:'100 Hz',w:'rect',
+  d:'Four diodes flip the negative half of the sine upward. The result is unipolar but far from steady — it still drops to zero twice per mains cycle.'},
+ {n:'Bulk cap',side:'hv',ttl:'the high-voltage dc bus',v:'~300 V',f:'100 Hz ripple',w:'bus',
+  d:'The bulk electrolytic capacitor fills in the valleys, discharging slightly between peaks. That residual sawtooth is the ripple, and it is why the capacitor has to be physically large: it stores the energy that carries the charger through each zero crossing.'},
+ {n:'GaN switch',side:'hv',ttl:'drain of the gan transistor',v:'0–300 V',f:'~300 kHz',w:'pwm',
+  d:'Here the smooth DC is deliberately destroyed. The transistor chops the bus into a high-frequency square wave. Width of the pulses — the duty cycle — is the control variable for output voltage.'},
+ {n:'Transformer',side:'hv',ttl:'transformer secondary winding',v:'0–28 V',f:'~300 kHz',w:'sec',
+  d:'The same square wave scaled by the turns ratio, and now electrically isolated. Note the ringing at each transition: leakage inductance resonating with parasitic capacitance, a real effect designers spend snubber components to tame.'},
+ {n:'Sync rect.',side:'lv',ttl:'after synchronous rectification',v:'0–20 V',f:'~300 kHz',w:'srect',
+  d:'A MOSFET turns on in step with the waveform to conduct current with far less drop than a diode. At 2 A, a diode would burn about 1 W as heat; a good sync rectifier loses a fraction of that.'},
+ {n:'Output cap',side:'lv',ttl:'across the output capacitors',v:'20 V',f:'ripple only',w:'out',
+  d:'Filtering flattens it into usable DC. What remains is tens of millivolts of ripple at the switching frequency — small, but it is the number a reviewer measures to judge build quality.'},
+ {n:'USB-C',side:'lv',ttl:'at the usb-c connector',v:'negotiated',f:'dc',w:'dc',
+  d:'Whatever the phone asked for. Under PPS this line moves continuously as the battery fills, tracking just above cell voltage.'}
+];
+var sRow=document.getElementById('stageRow'),cur=0,frozen=false;
+STAGES.forEach(function(s,i){
+ var b=document.createElement('button');
+ b.className='stage '+s.side+(i===0?' on':'');
+ b.innerHTML='<span class="n">'+String(i+1).padStart(2,'0')+'</span>'+s.n;
+ b.addEventListener('click',function(){cur=i;document.querySelectorAll('.stage').forEach(function(x,j){x.classList.toggle('on',j===i)});paintStage();});
+ sRow.appendChild(b);
+});
+function paintStage(){
+ var s=STAGES[cur];
+ document.getElementById('scopeTitle').textContent='stage '+(cur+1)+' · '+s.ttl;
+ document.getElementById('scopeRead').innerHTML='<span>amplitude <b>'+s.v+'</b></span><span>frequency <b>'+s.f+'</b></span><span>side <b>'+(s.side==='hv'?'primary (hazardous)':'secondary (isolated)')+'</b></span>';
+ document.getElementById('stageDesc').innerHTML='<p>'+s.d+'</p>';
+}
+paintStage();
+document.getElementById('freezeBtn').addEventListener('click',function(){
+ frozen=!frozen;this.classList.toggle('on',frozen);this.textContent=frozen?'Resume':'Freeze';
+});
+var cv=document.getElementById('scope'),cx=cv.getContext('2d'),ph=0;
+function wave(type,x){
+ var a=x*Math.PI*2;
+ switch(type){
+  case 'sine':return Math.sin(a*2);
+  case 'sineclean':return Math.sin(a*2)*0.98;
+  case 'rect':return Math.abs(Math.sin(a*2))*2-1;
+  case 'bus':{var p=(x*4)%1;return p<0.22?(0.60+0.16*(p/0.22)):(0.76-0.16*((p-0.22)/0.78));}
+  case 'pwm':return ((x*26)%1)<0.42?0.85:-0.85;
+  case 'sec':{var b=((x*26)%1)<0.42?-0.7:0.75,rg=Math.exp(-((x*26)%1)*14)*0.22*Math.sin(x*640);return b+rg;}
+  case 'srect':{var p=(x*26)%1;return p<0.42?-0.82:0.8+Math.exp(-(p-0.42)*10)*0.1;}
+  case 'out':return 0.6+0.045*Math.sin(x*Math.PI*52);
+  default:return 0.6;
+ }
+}
+function drawScope(){
+ var W=cv.width,H=cv.height;
+ cx.clearRect(0,0,W,H);
+ cx.strokeStyle='#1E2C28';cx.lineWidth=1;
+ for(var i=1;i<10;i++){cx.beginPath();cx.moveTo(W/10*i,0);cx.lineTo(W/10*i,H);cx.stroke();}
+ for(var j=1;j<6;j++){cx.beginPath();cx.moveTo(0,H/6*j);cx.lineTo(W,H/6*j);cx.stroke();}
+ cx.strokeStyle='#2C4038';cx.beginPath();cx.moveTo(0,H*0.72);cx.lineTo(W,H*0.72);cx.stroke();
+ var t=STAGES[cur].w,base=H*0.72,amp=H*0.34;
+ cx.strokeStyle='#5FD9A4';cx.lineWidth=2.2;cx.beginPath();
+ for(var px=0;px<=W;px++){
+  var x=px/W+ph,y=base-wave(t,x)*amp;
+  px===0?cx.moveTo(px,y):cx.lineTo(px,y);
+ }
+ cx.stroke();
+ cx.fillStyle='#4E6A62';cx.font='13px "IBM Plex Mono",monospace';
+ cx.fillText('0 V',6,base-6);
+}
+function loopScope(){requestAnimationFrame(loopScope);if(!frozen)ph+=0.0016;drawScope();}
+loopScope();
+
+/* ---------- ch3 flyback ---------- */
+var FB=[
+ {t:'Switch on — energy in',d:'The transistor conducts. Current ramps up in the primary winding, building a magnetic field in the ferrite core. The secondary is blocked, so nothing reaches the output; the output capacitor alone is supplying the phone during this beat.',on:true},
+ {t:'Switch off — energy out',d:'The transistor opens. The field collapses, voltage across the windings reverses, the secondary side conducts, and the stored energy is delivered into the output capacitor and the load. Then the cycle repeats, hundreds of thousands of times a second.',on:false}
+];
+var fbi=0;
+function fbDraw(){
+ var s=FB[fbi],on=s.on;
+ var live=on?'#A8382B':'#C9CFC9', out=on?'#C9CFC9':'#1E6B4A';
+ document.getElementById('fbSvg').innerHTML=
+ '<svg viewBox="0 0 660 230" style="width:100%;height:auto" role="img"><title>Flyback converter, beat '+(fbi+1)+'</title>'+
+ '<rect x="300" y="45" width="34" height="140" rx="3" fill="#E3E7E1" stroke="#7C8785"/>'+
+ '<text x="317" y="204" text-anchor="middle" font-size="11" font-family="IBM Plex Mono" fill="#4A5553">core</text>'+
+ '<path d="M270 60 q-20 12 0 24 q-20 12 0 24 q-20 12 0 24 q-20 12 0 24" fill="none" stroke="'+live+'" stroke-width="3"/>'+
+ '<path d="M364 60 q20 12 0 24 q20 12 0 24 q20 12 0 24 q20 12 0 24" fill="none" stroke="'+out+'" stroke-width="3"/>'+
+ '<path d="M270 60 H150 V40" fill="none" stroke="'+live+'" stroke-width="2"/>'+
+ '<path d="M270 156 H150 V190" fill="none" stroke="'+live+'" stroke-width="2"/>'+
+ '<rect x="128" y="18" width="44" height="22" rx="3" fill="#F7E6E3" stroke="#A8382B"/><text x="150" y="33" text-anchor="middle" font-size="10" font-family="IBM Plex Mono" fill="#A8382B">300 V</text>'+
+ '<rect x="128" y="190" width="44" height="24" rx="3" fill="'+(on?'#F7E6E3':'#EDEFEA')+'" stroke="'+(on?'#A8382B':'#BFC5BD')+'"/><text x="150" y="206" text-anchor="middle" font-size="10" font-family="IBM Plex Mono" fill="#4A5553">'+(on?'ON':'OFF')+'</text>'+
+ '<path d="M364 60 H510" fill="none" stroke="'+out+'" stroke-width="2"/>'+
+ '<path d="M364 156 H510 V60" fill="none" stroke="'+out+'" stroke-width="2"/>'+
+ '<rect x="498" y="88" width="24" height="40" rx="2" fill="#FFFFFF" stroke="'+out+'" stroke-width="2"/>'+
+ '<text x="510" y="146" text-anchor="middle" font-size="10" font-family="IBM Plex Mono" fill="#4A5553">C out</text>'+
+ '<path d="M522 108 H590" fill="none" stroke="'+out+'" stroke-width="2"/>'+
+ '<rect x="588" y="94" width="46" height="28" rx="3" fill="#E3EEE8" stroke="#1E6B4A"/><text x="611" y="112" text-anchor="middle" font-size="10" font-family="IBM Plex Mono" fill="#1E6B4A">phone</text>'+
+ '<text x="240" y="30" text-anchor="middle" font-size="11" font-family="IBM Plex Mono" fill="'+(on?'#A8382B':'#BFC5BD')+'">'+(on?'current ramping ▸':'no current')+'</text>'+
+ '<text x="430" y="30" text-anchor="middle" font-size="11" font-family="IBM Plex Mono" fill="'+(on?'#BFC5BD':'#1E6B4A')+'">'+(on?'blocked':'◂ energy delivered')+'</text>'+
+ '</svg>';
+ document.getElementById('fbCap').innerHTML='<strong>Beat '+(fbi+1)+' — '+s.t+'.</strong> '+s.d;
+}
+document.getElementById('fbNext').addEventListener('click',function(){fbi=(fbi+1)%2;fbDraw();});
+document.getElementById('fbPrev').addEventListener('click',function(){fbi=(fbi+1)%2;fbDraw();});
+fbDraw();
+
+/* ---------- ch4 gan ---------- */
+function ganUpd(){
+ var f=+document.getElementById('fSel').value;
+ var vol=Math.pow(300/f,0.72)*100;
+ document.getElementById('fOut').textContent=f+' kHz';
+ document.getElementById('mCore').textContent=Math.round(vol)+' %';
+ var gan=f>140;
+ document.getElementById('mTech').textContent=gan?'GaN':'Silicon';
+ document.getElementById('mTech').style.color=gan?'#1E6B4A':'#A9682A';
+ var sc=Math.cbrt(vol/100),w=Math.round(120*sc),h=Math.round(110*sc);
+ document.getElementById('coreBox').innerHTML='<div style="width:'+w+'px;height:'+h+'px;background:#2B2B2B;border-radius:3px;position:relative"><div style="position:absolute;inset:18% 30%;background:#EDEFEA;border-radius:2px"></div></div>';
+ document.getElementById('fNote').textContent = f<140
+  ? 'Silicon MOSFET territory. Switching losses dominate above roughly this point, so silicon designs stop here — and need a core this size.'
+  : (f<500 ? 'Typical GaN charger range. Core volume is well under half the silicon equivalent, which is most of the size difference you can feel in your hand.'
+           : 'Aggressive GaN design. Magnetics are tiny, but EMI becomes much harder to contain and the PCB layout has to be near-perfect.');
+}
+document.getElementById('fSel').addEventListener('input',ganUpd);ganUpd();
+</script>
+<script>
+/* ---------- ch5 pd handshake ---------- */
+var DEVICES=[
+ {k:'phone',n:'Phone (PPS)',v:9.8,i:4.05,steps:[
+  ['dev','Asserts Rd on CC1 — I am a sink'],
+  ['chg','Detects attach, applies vSafe5V and Rp advertising 3.0 A'],
+  ['chg','Source_Capabilities: 5V/3A, 9V/3A, 15V/3A, 20V/2.25A, PPS 3.3–11V/4.05A'],
+  ['dev','GoodCRC — message received intact'],
+  ['dev','Request: APDO 5, 9.80 V, 4.05 A operating current'],
+  ['chg','GoodCRC'],
+  ['chg','Accept — request is within capability'],
+  ['chg','Ramping VBUS 5.00 V → 9.80 V'],
+  ['chg','PS_RDY — new voltage is stable'],
+  ['ok','Contract established · 9.80 V × 4.05 A ≈ 39.7 W'],
+  ['dev','Battery at 3.62 V/cell — will renegotiate upward every 2 s as it fills']
+ ]},
+ {k:'laptop',n:'Laptop',v:20,i:2.25,steps:[
+  ['dev','Asserts Rd on CC2 — I am a sink'],
+  ['chg','Detects attach, applies vSafe5V'],
+  ['chg','Source_Capabilities: 5V/3A, 9V/3A, 15V/3A, 20V/2.25A, PPS 3.3–11V/4.05A'],
+  ['dev','GoodCRC'],
+  ['dev','Request: fixed PDO 4, 20 V, 2.25 A — highest available'],
+  ['chg','GoodCRC'],
+  ['chg','Accept'],
+  ['chg','Ramping VBUS 5.00 V → 20.00 V'],
+  ['chg','PS_RDY'],
+  ['ok','Contract established · 20 V × 2.25 A = 45 W'],
+  ['dev','Charger is below laptop\'s 65 W preference — will charge, slowly, while in use']
+ ]},
+ {k:'old',n:'Old USB-A device',v:5,i:0.5,steps:[
+  ['dev','No CC signalling — legacy device behind an adapter'],
+  ['chg','No PD sink detected, falling back to USB default'],
+  ['chg','Holding vSafe5V, current limited by Rp advertisement'],
+  ['dev','Draws 500 mA and does not negotiate further'],
+  ['ok','No contract · 5 V × 0.5 A = 2.5 W'],
+  ['chg','All 45 W of capability sits idle — the port never asks for it']
+ ]},
+ {k:'bad',n:'Non-compliant cable',v:5,i:3,steps:[
+  ['dev','Asserts Rd — sink present'],
+  ['chg','Source_Capabilities sent'],
+  ['dev','No GoodCRC returned within tReceive'],
+  ['chg','Retrying — attempt 2 of 3'],
+  ['dev','No GoodCRC returned'],
+  ['chg','Retries exhausted, aborting PD contract'],
+  ['ok','Fallback · 5 V only. This is why a bad cable makes a good charger look slow.']
+ ]}
+];
+var devI=0,pdTimer=null;
+var dp=document.getElementById('devPick');
+DEVICES.forEach(function(d,i){
+ var b=document.createElement('button');b.className='chip'+(i===0?' on':'');b.textContent=d.n;
+ b.addEventListener('click',function(){devI=i;dp.querySelectorAll('button').forEach(function(x,j){x.classList.toggle('on',j===i)});pdReset();});
+ dp.appendChild(b);
+});
+function pdSet(v,i,st){
+ document.getElementById('pdV').textContent=v.toFixed(2)+' V';
+ document.getElementById('pdI').textContent=i.toFixed(2)+' A';
+ document.getElementById('pdP').textContent=(v*i).toFixed(1)+' W';
+ document.getElementById('pdS').textContent=st;
+}
+function pdReset(){
+ clearTimeout(pdTimer);
+ document.getElementById('pdLog').innerHTML='<div class="t">— port idle —</div>';
+ pdSet(5,0.5,'unplugged');
+ document.getElementById('pdRun').disabled=false;
+}
+function pdRun(){
+ var d=DEVICES[devI],k=0,t0=0;
+ document.getElementById('pdLog').innerHTML='';
+ document.getElementById('pdRun').disabled=true;
+ pdSet(5,0.5,'attached');
+ (function step(){
+  if(k>=d.steps.length){document.getElementById('pdRun').disabled=false;return;}
+  var s=d.steps[k],cls=s[0],box=document.getElementById('pdLog');
+  t0+=Math.round(4+Math.random()*30);
+  var who=cls==='dev'?'SINK':(cls==='chg'?'SRC ':'    ');
+  box.innerHTML+='<div><span class="t">'+String(t0).padStart(4,' ')+'ms</span> <span class="'+cls+'">'+who+'</span> '+s[1]+'</div>';
+  box.scrollTop=box.scrollHeight;
+  if(s[1].indexOf('Ramping')===0)pdSet(d.v,d.i,'ramping');
+  if(s[0]==='ok')pdSet(d.v,d.i,'contract');
+  k++;pdTimer=setTimeout(step,620);
+ })();
+}
+document.getElementById('pdRun').addEventListener('click',pdRun);
+document.getElementById('pdReset').addEventListener('click',pdReset);
+pdReset();
+
+/* ---------- ch6 charge sim ---------- */
+var WATT=[{n:'5 W',w:5},{n:'18 W',w:18},{n:'45 W',w:45},{n:'45 W + PPS',w:45,pps:true}];
+var wi=2,wp=document.getElementById('wPick');
+WATT.forEach(function(o,i){
+ var b=document.createElement('button');b.className='chip'+(i===2?' on':'');b.textContent=o.n;
+ b.addEventListener('click',function(){wi=i;wp.querySelectorAll('button').forEach(function(x,j){x.classList.toggle('on',j===i)});cReset();});
+ wp.appendChild(b);
+});
+var cc=document.getElementById('chg'),cg=cc.getContext('2d');
+var STEPMIN=0.5,soc=0,temp=26,mins=0,running=false,hist=[],cAnim=null;
+function cReset(){
+ running=false;clearTimeout(cAnim);
+ soc=0;mins=0;temp=document.getElementById('cHot').checked?32:26;hist=[];
+ document.getElementById('cRun').textContent='Start charging';
+ cStats();cDraw();
+}
+function cStats(){
+ document.getElementById('cSoc').textContent=Math.round(soc)+' %';
+ document.getElementById('cTmp').textContent=temp.toFixed(1)+' °C';
+ document.getElementById('cTim').textContent=Math.floor(mins/60)+':'+String(Math.floor(mins%60)).padStart(2,'0');
+}
+function powerAt(){
+ var o=WATT[wi],amb=document.getElementById('cHot').checked?32:26,p=o.w;
+ if(soc>80)p=Math.min(p,o.w*(1-(soc-80)/20*0.86));
+ else if(soc>60)p=Math.min(p,o.w*(1-(soc-60)/20*0.30));
+ if(!o.pps&&o.w>=45)p*=0.90;
+ if(temp>42)p*=Math.max(0.25,1-(temp-42)*0.12);
+ if(soc>=100)p=0;
+ return Math.max(0,p);
+}
+function cStep(){
+ if(!running)return;
+ var amb=document.getElementById('cHot').checked?32:26;
+ var p=powerAt(),cap=5000*3.85/1000;
+ soc=Math.min(100,soc+(p*0.82/cap)*(STEPMIN/60)*100);
+ temp+=((amb+p*0.40)-temp)*0.018;
+ mins+=STEPMIN;
+ hist.push({s:soc,p:p,t:temp});
+ if(hist.length>1400)hist.shift();
+ cStats();cDraw();
+ if(soc>=100){running=false;document.getElementById('cRun').textContent='Charged';return;}
+ cAnim=setTimeout(cStep,50);
+}
+function cDraw(){
+ var W=cc.width,H=cc.height,pad=34;
+ cg.clearRect(0,0,W,H);
+ cg.strokeStyle='#E4E7E2';cg.lineWidth=1;
+ for(var i=0;i<=4;i++){var y=pad+(H-pad*2)/4*i;cg.beginPath();cg.moveTo(pad,y);cg.lineTo(W-pad,y);cg.stroke();}
+ cg.fillStyle='#7C8785';cg.font='12px "IBM Plex Mono",monospace';
+ cg.fillText('100%',4,pad+4);cg.fillText('0',18,H-pad+4);
+ var maxT=Math.max(90,mins);
+ function plot(key,max,color,wdt){
+  cg.strokeStyle=color;cg.lineWidth=wdt;cg.beginPath();
+  hist.forEach(function(h,i){
+   var x=pad+(W-pad*2)*Math.min(1,(i*STEPMIN)/maxT),y=H-pad-(H-pad*2)*Math.min(1,h[key]/max);
+   i===0?cg.moveTo(x,y):cg.lineTo(x,y);
+  });
+  cg.stroke();
+ }
+ plot('p',50,'#2A5FA8',1.8);
+ plot('t',60,'#A8382B',1.5);
+ plot('s',100,'#1E6B4A',2.4);
+ cg.fillStyle='#7C8785';
+ cg.fillText(Math.round(maxT)+' min',W-pad-48,H-pad+18);
+ document.getElementById('cPow').textContent=(hist.length?hist[hist.length-1].p:0).toFixed(1)+' W';
+}
+document.getElementById('cRun').addEventListener('click',function(){
+ if(soc>=100)return cReset();
+ running=!running;this.textContent=running?'Pause':'Resume';
+ if(running)cStep();
+});
+document.getElementById('cReset').addEventListener('click',cReset);
+document.getElementById('cHot').addEventListener('change',cReset);
+cReset();
+
+/* ---------- board 3d ---------- */
+(function(){
+var host=document.getElementById('stage3d');
+if(typeof THREE==='undefined'){document.getElementById('b3dFall').textContent='The 3D viewer needs an internet connection to load three.js. Everything else on this page works offline.';return;}
+document.getElementById('b3dFall').style.display='none';
+var W=host.clientWidth||660,H=380;
+var sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(40,W/H,0.1,3000);
+var rd=new THREE.WebGLRenderer({antialias:true,alpha:true});
+rd.setPixelRatio(Math.min(devicePixelRatio,2));rd.setSize(W,H);host.appendChild(rd.domElement);
+sc.add(new THREE.HemisphereLight(0xdfe8e4,0x20262a,0.85));
+var key=new THREE.DirectionalLight(0xffffff,0.85);key.position.set(55,95,60);sc.add(key);
+var fill=new THREE.DirectionalLight(0xbcd3e8,0.35);fill.position.set(-70,45,-55);sc.add(fill);
+var rim=new THREE.DirectionalLight(0xffffff,0.25);rim.position.set(0,30,-90);sc.add(rim);
+var root=new THREE.Group();sc.add(root);
+
+function cvTex(w,h,draw){
+ var c=document.createElement('canvas');c.width=w;c.height=h;
+ draw(c.getContext('2d'),w,h);
+ var t=new THREE.CanvasTexture(c);t.anisotropy=4;return t;
+}
+function pcbTex(){
+ return cvTex(1408,800,function(g,w,h){
+  g.fillStyle='#14603c';g.fillRect(0,0,w,h);
+  g.fillStyle='#177049';
+  for(var i=0;i<70;i++){g.fillRect(Math.random()*w,Math.random()*h,Math.random()*120+20,3);}
+  g.strokeStyle='#1e8055';g.lineWidth=7;g.lineCap='round';
+  var seed=[[60,180],[230,180],[230,420],[430,420],[430,250],[640,250]];
+  g.beginPath();g.moveTo(60,140);
+  [[240,140],[240,300],[470,300],[470,180],[700,180]].forEach(function(p){g.lineTo(p[0],p[1]);});g.stroke();
+  g.beginPath();g.moveTo(60,640);[[300,640],[300,520],[720,520]].forEach(function(p){g.lineTo(p[0],p[1]);});g.stroke();
+  g.strokeStyle='#b98b42';g.lineWidth=9;
+  g.beginPath();g.moveTo(900,200);[[1120,200],[1120,360],[1330,360]].forEach(function(p){g.lineTo(p[0],p[1]);});g.stroke();
+  g.beginPath();g.moveTo(900,600);[[1180,600],[1180,470],[1330,470]].forEach(function(p){g.lineTo(p[0],p[1]);});g.stroke();
+  for(var k=0;k<90;k++){
+   var px=Math.random()*w,py=Math.random()*h;
+   if(Math.abs(px-798)<70)continue;
+   g.fillStyle='#c79a52';g.beginPath();g.arc(px,py,7,0,6.3);g.fill();
+   g.fillStyle='#0f4a2f';g.beginPath();g.arc(px,py,3,0,6.3);g.fill();
+  }
+  g.fillStyle='#0c3a26';g.fillRect(770,60,56,680);
+  g.fillStyle='#e8ece6';g.font='500 30px monospace';
+  g.fillText('PRIMARY · 300 VDC · HAZARDOUS',90,66);
+  g.fillText('SECONDARY · SELV',900,66);
+  g.font='500 26px monospace';g.fillStyle='#cfe0d6';
+  g.fillText('F1',180,760);g.fillText('L1',330,760);g.fillText('BD1',470,760);
+  g.fillText('C1',600,760);g.fillText('Q1',690,120);g.fillText('T1',740,760);
+  g.fillText('U2',960,760);g.fillText('C5 C6',1080,760);g.fillText('U1',1220,760);g.fillText('J1',1340,760);
+  g.font='500 34px monospace';g.fillStyle='#f2f5f0';
+  g.fillText('45W GaN · PD3.1 · PPS',340,415);
+  g.font='500 22px monospace';g.fillStyle='#9fc4b0';
+  g.fillText('REV C  ·  IEC 62368-1  ·  DO NOT OPEN',340,448);
+ });
+}
+function labelTex(txt,sub){
+ var pad=18,fw=Math.max(txt.length*15,(sub?sub.length*11:0))+pad*2;
+ return cvTex(Math.ceil(fw),sub?86:58,function(g,w,h){
+  g.fillStyle='rgba(16,23,21,0.92)';g.strokeStyle='#5FD9A4';g.lineWidth=2;
+  g.beginPath();g.rect(1,1,w-2,h-2);g.fill();g.stroke();
+  g.fillStyle='#EDEFEA';g.font='500 26px "IBM Plex Sans",sans-serif';g.textBaseline='middle';
+  g.fillText(txt,pad,sub?30:h/2);
+  if(sub){g.fillStyle='#8FB3A5';g.font='400 19px monospace';g.fillText(sub,pad,62);}
+ });
+}
+function sleeveTex(bg,stripe,l1,l2){
+ return cvTex(512,256,function(g,w,h){
+  g.fillStyle=bg;g.fillRect(0,0,w,h);
+  g.fillStyle=stripe;g.fillRect(20,0,46,h);
+  g.fillStyle='rgba(255,255,255,0.10)';g.fillRect(0,0,w,26);
+  g.fillStyle='#e9eef2';g.font='500 46px monospace';g.fillText(l1,110,120);
+  g.font='400 30px monospace';g.fillStyle='#b9c6cf';g.fillText(l2,110,170);
+ });
+}
+function icTex(l1,l2){
+ return cvTex(256,256,function(g,w,h){
+  g.fillStyle='#17181a';g.fillRect(0,0,w,h);
+  g.fillStyle='#2a2c2f';g.fillRect(0,0,w,10);
+  g.fillStyle='#c9cdd2';g.beginPath();g.arc(30,226,11,0,6.3);g.fill();
+  g.fillStyle='#d7dbdf';g.font='500 34px monospace';g.fillText(l1,54,110);
+  g.font='400 26px monospace';g.fillStyle='#9aa1a8';g.fillText(l2,54,152);
+ });
+}
+function tapeTex(){
+ return cvTex(512,256,function(g,w,h){
+  g.fillStyle='#232323';g.fillRect(0,0,w,h);
+  g.fillStyle='#6d5836';g.fillRect(0,26,w,44);g.fillRect(0,186,w,44);
+  g.fillStyle='rgba(255,255,255,0.05)';g.fillRect(0,0,w,14);
+  g.fillStyle='#cfd3d6';g.font='500 40px monospace';g.fillText('EE16  1:6',96,146);
+ });
+}
+var STD=function(o){return new THREE.MeshStandardMaterial(o);};
+
+var pcbMats=[STD({color:0x0f4a2f,roughness:0.85}),STD({color:0x0f4a2f,roughness:0.85}),
+ STD({map:pcbTex(),roughness:0.62,metalness:0.06}),STD({color:0x0c3d27,roughness:0.9}),
+ STD({color:0x0f4a2f,roughness:0.85}),STD({color:0x0f4a2f,roughness:0.85})];
+var pcb=new THREE.Mesh(new THREE.BoxGeometry(74,1.6,42),pcbMats);root.add(pcb);
+var slot=new THREE.Mesh(new THREE.BoxGeometry(1.9,2.0,34),STD({color:0x07291b,roughness:1}));
+slot.position.set(5,0.05,0);root.add(slot);
+
+var ZONE={p:0xA8382B,s:0xA9682A,q:0x1E6B4A,c:0x2A5FA8},parts=[],labels=[],leads=[];
+function addPart(mesh,o){
+ mesh.position.set(o.x,o.y,o.z);
+ mesh.userData={name:o.name,spec:o.spec,desc:o.desc,z:o.zone,by:o.y,base:mesh.material};
+ root.add(mesh);parts.push(mesh);
+ var tex=labelTex(o.name,o.spec),ar=tex.image.width/tex.image.height;
+ var spr=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,depthTest:false,transparent:true}));
+ var hgt=4.2;spr.scale.set(hgt*ar,hgt,1);
+ spr.position.set(o.x,o.y+(o.lh||14),o.z);spr.renderOrder=10;
+ root.add(spr);labels.push(spr);
+ var lg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(o.x,o.y,o.z),new THREE.Vector3(o.x,o.y+(o.lh||14)-hgt/2,o.z)]);
+ var ln=new THREE.Line(lg,new THREE.LineBasicMaterial({color:0x5FD9A4,transparent:true,opacity:0.5,depthTest:false}));
+ ln.renderOrder=9;root.add(ln);leads.push(ln);
+ return mesh;
+}
+function boxMesh(w,h,d,mat){return new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);}
+function cylMesh(r,h,mats){return new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,26),mats);}
+
+addPart(boxMesh(4,7,26,STD({color:0x9aa0a6,roughness:0.35,metalness:0.55})),
+ {name:'AC input pins',spec:'brass · 250 V',x:-34,y:4.3,z:0,zone:'p',lh:16,
+  desc:'Live and neutral arrive from the folding wall prongs. Everything left of the routed slot sits at mains potential and stays dangerous for minutes after unplugging, because the bulk capacitor holds its charge.'});
+addPart(cylMesh(2.2,9,[STD({map:sleeveTex('#d8cfc0','#a89e8c','T2A','250V'),roughness:0.7}),STD({color:0xc9c0b0}),STD({color:0xc9c0b0})]),
+ {name:'Fuse F1',spec:'2 A slow-blow · 250 V',x:-28,y:5.3,z:-13,zone:'p',lh:15,
+  desc:'The last line of defence. A slow-blow rating lets it survive the inrush surge when the bulk capacitor charges at plug-in, while still opening fast enough if the primary switch fails short.'});
+addPart(boxMesh(11,10,11,STD({color:0x35383a,roughness:0.8})),
+ {name:'Common-mode choke L1',spec:'~10 mH · CM',x:-25,y:5.8,z:4,zone:'p',lh:17,
+  desc:'Two windings on one core, wound so that mains current cancels the flux but common-mode noise does not. It presents almost no impedance to 50 Hz power and a high impedance to the megahertz junk the switching stage produces.'});
+addPart(boxMesh(7,5,5,STD({map:icTex('MB6S','600V 0.5A'),roughness:0.75})),
+ {name:'Bridge rectifier BD1',spec:'600 V · 0.5 A',x:-14,y:3.3,z:-13,zone:'p',lh:15,
+  desc:'Four diodes in one package. Voltage rating must exceed the 325 V mains peak with margin for surges, which is why 600 V parts are standard even on a 220 V input.'});
+addPart(cylMesh(6.5,21,[STD({map:sleeveTex('#1d3550','#8a94a0','330µF','400V 105°C'),roughness:0.55}),STD({color:0x9aa0a6,roughness:0.4,metalness:0.4}),STD({color:0x1d3550})]),
+ {name:'Bulk capacitor C1',spec:'330 µF · 400 V · 105 °C',x:-13,y:11.3,z:7,zone:'p',lh:16,
+  desc:'Stores the energy that carries the converter across each mains zero crossing. The 105 °C rating matters more than the capacitance: electrolyte life roughly halves for every 10 K of temperature rise, so this part usually decides how long the charger lives.'});
+addPart(boxMesh(7,9,7,STD({color:0xa8aeb4,roughness:0.3,metalness:0.6})),
+ {name:'GaN switch Q1',spec:'650 V · ~150 mΩ',x:-2,y:5.3,z:-13,zone:'s',lh:16,
+  desc:'Chops the 300 V bus a few hundred thousand times a second. Low gate charge and low output capacitance are what allow the high frequency; the fin is there because even a few hundred milliohms of on-resistance becomes real heat at these currents.'});
+addPart(boxMesh(17,13,15,[STD({map:tapeTex(),roughness:0.8}),STD({map:tapeTex(),roughness:0.8}),STD({color:0x2a2a2a,roughness:0.9}),STD({color:0x1f1f1f}),STD({map:tapeTex(),roughness:0.8}),STD({map:tapeTex(),roughness:0.8})]),
+ {name:'Transformer T1',spec:'EE16 ferrite · 1:6',x:-1,y:7.3,z:7,zone:'s',lh:16,
+  desc:'Not a transformer in the classical sense but an energy bucket: it stores energy in the core gap during switch-on and releases it during switch-off. The layers of tape are reinforced insulation, and the margin at each end of the bobbin is specified by safety standards, not by the designer.'});
+addPart(boxMesh(2,3,5,STD({color:0xe8e4d8,roughness:0.9})),
+ {name:'Isolation barrier',spec:'≥ 6.4 mm creepage',x:5,y:2.3,z:-18,zone:'c',lh:14,
+  desc:'The routed slot and its clearance. Creepage is measured along the surface, so cutting a slot buys distance without widening the board. Only the transformer and the optocoupler cross it, and neither does so conductively.'});
+addPart(boxMesh(5,4,4,STD({map:icTex('PC817','opto'),roughness:0.8})),
+ {name:'Optocoupler U3',spec:'5 kV isolation',x:10,y:2.8,z:15,zone:'c',lh:14,
+  desc:'An LED and a phototransistor facing each other across an insulating gap. It carries the output-voltage error back to the primary controller as light, closing the regulation loop without closing an electrical circuit.'});
+addPart(boxMesh(6,4,6,STD({map:icTex('SR','sync rect'),roughness:0.78})),
+ {name:'Synchronous rectifier U2',spec:'100 V · 6 mΩ',x:13,y:2.8,z:-12,zone:'q',lh:15,
+  desc:'A MOSFET timed to conduct exactly when a diode would. At 3 A a Schottky would drop about 0.4 V and burn over a watt; six milliohms drops millivolts instead. Getting the timing wrong by a hundred nanoseconds shoots current backwards through the transformer.'});
+addPart(cylMesh(4,11,[STD({map:sleeveTex('#2c2f33','#8f969c','470µF','25V polymer'),roughness:0.6}),STD({color:0x9aa0a6,roughness:0.45,metalness:0.35}),STD({color:0x2c2f33})]),
+ {name:'Output capacitor C5',spec:'470 µF · 25 V · polymer',x:17,y:6.3,z:6,zone:'q',lh:15,
+  desc:'Polymer construction for low equivalent series resistance. This is the part that supplies the phone during the first microseconds of a load step, before the control loop can react.'});
+addPart(cylMesh(4,11,[STD({map:sleeveTex('#2c2f33','#8f969c','470µF','25V polymer'),roughness:0.6}),STD({color:0x9aa0a6,roughness:0.45,metalness:0.35}),STD({color:0x2c2f33})]),
+ {name:'Output capacitor C6',spec:'470 µF · 25 V · polymer',x:26,y:6.3,z:6,zone:'q',lh:15,
+  desc:'A second capacitor in parallel. Two smaller cans have lower combined series resistance and spread the ripple current between them, so both run cooler than one large part would.'});
+addPart(boxMesh(8,2.5,6,STD({map:icTex('PD3.1','PPS ctrl'),roughness:0.75})),
+ {name:'PD / PPS controller U1',spec:'PD 3.1 · 20 mV steps',x:22,y:2.1,z:-12,zone:'c',lh:14,
+  desc:'Speaks Power Delivery on the CC pins, advertises the source capabilities, validates every request against what the hardware can actually do, and commands the primary side to move the output. It also enforces the ten-second PPS timeout.'});
+addPart(boxMesh(3,2,3,STD({color:0x2f2f2f,roughness:0.85})),
+ {name:'NTC thermistor',spec:'100 kΩ · B 3950',x:30,y:1.8,z:-15,zone:'c',lh:13,
+  desc:'Resistance falls as temperature rises. The controller reads it continuously and renegotiates power downward before anything approaches its rating, which is the mechanism behind the thermal throttle you can watch in chapter 9.'});
+addPart(boxMesh(9,3.4,10,STD({color:0xc3c8cc,roughness:0.25,metalness:0.7})),
+ {name:'USB-C receptacle J1',spec:'24 pin · 5 A rated',x:34,y:2.5,z:0,zone:'q',lh:14,
+  desc:'Twenty-four pins, symmetric so the plug works either way up. Two of them — CC1 and CC2 — carry the entire negotiation. The shell is grounded to give common-mode noise a return path that is not the phone.'});
+
+/* power flow path */
+var flowPts=[[-34,7,0],[-25,11,4],[-14,6,-13],[-13,22,7],[-2,10,-13],[-1,14,7],[13,6,-12],[21,12,6],[34,5,0]]
+ .map(function(p){return new THREE.Vector3(p[0],p[1],p[2]);});
+var curve=new THREE.CatmullRomCurve3(flowPts);
+var flowLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(160)),
+ new THREE.LineBasicMaterial({color:0xEF9F27,transparent:true,opacity:0.55}));
+flowLine.visible=false;root.add(flowLine);
+var dots=[];
+for(var i=0;i<7;i++){
+ var d=new THREE.Mesh(new THREE.SphereGeometry(1.1,12,12),new THREE.MeshBasicMaterial({color:0xFFC46A}));
+ d.visible=false;root.add(d);dots.push(d);
+}
+
+/* interaction */
+var ray=new THREE.Raycaster(),mo=new THREE.Vector2(),sel=null,cvs=rd.domElement;
+var drag=false,px=0,py=0,mv=0,rx=0.42,ry=-0.42,dist=112;
+function applyCam(){cam.position.set(Math.sin(0)*dist,dist*0.72,dist);cam.lookAt(0,0,0);}
+function applyRot(){root.rotation.set(rx,ry,0);}
+applyCam();applyRot();
+cvs.style.cursor='grab';
+cvs.addEventListener('mousedown',function(e){drag=true;mv=0;px=e.clientX;py=e.clientY;cvs.style.cursor='grabbing';});
+addEventListener('mouseup',function(){drag=false;cvs.style.cursor='grab';});
+addEventListener('mousemove',function(e){
+ if(!drag)return;var dx=e.clientX-px,dy=e.clientY-py;px=e.clientX;py=e.clientY;mv+=Math.abs(dx)+Math.abs(dy);
+ ry+=dx*0.008;rx=Math.max(-0.25,Math.min(1.5,rx+dy*0.006));applyRot();
+});
+cvs.addEventListener('wheel',function(e){e.preventDefault();dist=Math.max(52,Math.min(240,dist+e.deltaY*0.09));applyCam();},{passive:false});
+cvs.addEventListener('touchstart',function(e){if(e.touches.length===1){drag=true;mv=0;px=e.touches[0].clientX;py=e.touches[0].clientY;}},{passive:true});
+cvs.addEventListener('touchmove',function(e){
+ if(!drag||e.touches.length!==1)return;var dx=e.touches[0].clientX-px,dy=e.touches[0].clientY-py;
+ px=e.touches[0].clientX;py=e.touches[0].clientY;mv+=Math.abs(dx)+Math.abs(dy);
+ ry+=dx*0.008;rx=Math.max(-0.25,Math.min(1.5,rx+dy*0.006));applyRot();
+},{passive:true});
+cvs.addEventListener('touchend',function(){drag=false;});
+function pickAt(cx,cy){
+ var r=cvs.getBoundingClientRect();
+ mo.x=((cx-r.left)/r.width)*2-1;mo.y=-((cy-r.top)/r.height)*2+1;
+ ray.setFromCamera(mo,cam);
+ var hit=ray.intersectObjects(parts,false);
+ if(sel){sel.material.forEach?sel.material.forEach(function(m){m.emissive.setHex(0x000000)}):sel.material.emissive.setHex(0x000000);sel=null;}
+ if(hit.length){
+  sel=hit[0].object;
+  var hex=ZONE[sel.userData.z];
+  (Array.isArray(sel.material)?sel.material:[sel.material]).forEach(function(m){m.emissive.setHex(hex);m.emissiveIntensity=0.45;});
+  document.getElementById('b3dName').textContent=sel.userData.name;
+  document.getElementById('b3dSpec').textContent=sel.userData.spec;
+  document.getElementById('b3dDesc').textContent=sel.userData.desc;
+ }
+}
+cvs.addEventListener('click',function(e){if(mv<=6)pickAt(e.clientX,e.clientY);});
+
+function tog(id,fn){var b=document.getElementById(id);b.addEventListener('click',function(){b.classList.toggle('on');fn(b.classList.contains('on'),b);});}
+tog('tLab',function(on){labels.forEach(function(l){l.visible=on});leads.forEach(function(l){l.visible=on});});
+var zoneOn=false;
+tog('tZone',function(on){
+ zoneOn=on;
+ parts.forEach(function(p){
+  (Array.isArray(p.material)?p.material:[p.material]).forEach(function(m){
+   if(on){if(m.__c===undefined)m.__c=m.color.getHex();m.color.setHex(ZONE[p.userData.z]);}
+   else if(m.__c!==undefined)m.color.setHex(m.__c);
+  });
+ });
+});
+tog('tFlow',function(on){flowLine.visible=on;dots.forEach(function(d){d.visible=on});});
+var exp=false;
+document.getElementById('bExp').addEventListener('click',function(){
+ exp=!exp;this.classList.toggle('on',exp);this.textContent=exp?'Collapse':'Explode';
+ parts.forEach(function(p,i){
+  var off=exp?15+(i%4)*5:0;
+  p.position.y=p.userData.by+off;
+  labels[i].position.y=p.userData.by+off+(labels[i].userData.lh||14);
+  var pts=[new THREE.Vector3(p.position.x,p.position.y,p.position.z),
+           new THREE.Vector3(p.position.x,labels[i].position.y-2.1,p.position.z)];
+  leads[i].geometry.setFromPoints(pts);
+ });
+});
+labels.forEach(function(l,i){l.userData={lh:l.position.y-parts[i].userData.by};});
+function view(nrx,nry,nd){rx=nrx;ry=nry;dist=nd;applyRot();applyCam();}
+document.getElementById('vIso').addEventListener('click',function(){view(0.42,-0.42,112);});
+document.getElementById('vTop').addEventListener('click',function(){view(0.02,0,96);});
+document.getElementById('vSide').addEventListener('click',function(){view(1.32,0,104);});
+document.getElementById('tLab').classList.add('on');
+var t0=0;
+(function anim(){
+ requestAnimationFrame(anim);t0+=0.0032;
+ if(flowLine.visible){
+  dots.forEach(function(d,i){
+   var u=(t0+i/dots.length)%1,p=curve.getPointAt(u);
+   d.position.copy(p);
+  });
+ }
+ rd.render(sc,cam);
+})();
+addEventListener('resize',function(){var w=host.clientWidth||660;rd.setSize(w,H);cam.aspect=w/H;cam.updateProjectionMatrix();});
+})();
+
+/* ---------- ch9 quiz ---------- */
+var QUIZ=[
+ {q:'A charger delivers 45 W. Why does it prefer to do so at 20 V rather than 5 V?',
+  a:['Lithium cells charge faster at higher voltage','Cable loss scales with the square of current, so lower current wastes far less','USB-C connectors cannot pass more than 1 A','Higher voltage reduces the number of components needed'],c:1,
+  e:'At 5 V, 45 W means 9 A. Loss is I²R, so nine amps through a thin cable wastes about sixteen times what 2.25 A does.'},
+ {q:'What is the bulk electrolytic capacitor actually for?',
+  a:['Storing energy to carry the charger through each mains zero crossing','Filtering radio interference','Isolating the user from mains voltage','Setting the output voltage'],c:0,
+  e:'Rectified mains drops to zero 100 times a second. The bulk cap supplies the converter during those valleys, which is why it has to be physically large.'},
+ {q:'In a flyback converter, when does energy reach the output?',
+  a:['Continuously, in both switch states','While the transistor is on','While the transistor is off, as the magnetic field collapses','Only at the mains peak'],c:2,
+  e:'Energy goes into the core while the switch is on and comes out of it while the switch is off. That alternation is what the name describes.'},
+ {q:'What does GaN primarily buy a charger designer?',
+  a:['Higher output voltage','Higher switching frequency at acceptable loss, so smaller magnetics','Immunity to overheating','Compatibility with more phones'],c:1,
+  e:'Lower gate charge and output capacitance mean faster transitions. Faster switching means each energy packet is smaller, so the transformer can shrink.'},
+ {q:'Why does the isolation barrier exist?',
+  a:['To separate analogue and digital circuits','To reduce electromagnetic interference','So no conductive path connects mains voltage to anything you can touch','To keep the two halves of the board at the same temperature'],c:2,
+  e:'Energy crosses only as a magnetic field through the transformer and as light through the optocoupler. Cutting corners here is what makes counterfeit chargers dangerous.'},
+ {q:'A phone requests 9.8 V through PPS instead of a fixed 9 V. What is the advantage?',
+  a:['It charges the battery with a higher voltage overall','The charger runs cooler because it works less','The voltage can sit just above cell voltage, so the phone skips a lossy internal conversion','PPS transfers more data alongside power'],c:2,
+  e:'Direct charging feeds the cells almost straight from the charger. That removes a conversion stage and the heat it would generate inside the phone.'},
+ {q:'Why does the last 20 % of a charge take disproportionately long?',
+  a:['The charger reduces output to save energy','The battery switches to constant-voltage charging and current tapers to avoid lithium plating','The cable warms up and limits current','The phone prioritises background tasks'],c:1,
+  e:'Constant-voltage phase is a chemistry requirement. Forcing current at a full cell plates metallic lithium on the anode and permanently degrades capacity.'},
+ {q:'Why does a flyback controller sometimes vary its switching frequency instead of holding it fixed?',
+  a:['To confuse electromagnetic interference testing','To turn the switch on at the bottom of a ringing valley, where transition loss is lowest','Because the mains frequency drifts','To match the phone\'s clock'],c:1,
+  e:'Valley switching means the transistor turns on across the smallest available voltage. The frequency drifts because the valleys move with load.'},
+ {q:'A 45 W charger delivering only 2 W measures far worse efficiency than at full load. Why?',
+  a:['Conduction loss is worst at light load','Switching loss is roughly constant with load, so it dominates when output is small','The cable resistance increases','The transformer saturates at light load'],c:1,
+  e:'Switching loss is paid per transition regardless of how much power each transition carries. Burst mode exists to skip transitions at light load and claw that efficiency back.'},
+ {q:'A 2:1 charge pump inside a phone reaches about 97 % efficiency. What does it demand of the charger?',
+  a:['A voltage close to exactly twice the cell voltage, which only PPS can track','A fixed 20 V supply','At least 5 A of current','A data connection on D+ and D-'],c:0,
+  e:'The pump divides by exactly two and nothing else. If the input is not near twice the cell voltage, the arrangement does not work — which is why direct charging and PPS arrived together.'},
+ {q:'A capable phone and a real 45 W charger are limited to 3 A. What is the most likely missing piece?',
+  a:['A PPS-capable charger','An e-marker chip in the cable declaring a higher current rating','A faster wall socket','A firmware update on the charger'],c:1,
+  e:'Above 3 A the cable must identify itself over the CC line. Without an e-marker the contract is capped, and nothing in the interface tells the user why.'},
+ {q:'A phone with a compliant cable and a real 45 W charger still charges at 5 V. What is the most likely cause?',
+  a:['The charger is faulty','The negotiation never completed — no valid PD contract was established','The battery is too cold','The phone needs a software update'],c:1,
+  e:'5 V is the safe fallback. If capability messages are not acknowledged, both sides retreat to it rather than guessing.'}
+];
+var qb=document.getElementById('quizBox'),answered={};
+QUIZ.forEach(function(item,qi){
+ var d=document.createElement('div');d.className='q';
+ var h='<p class="qt">'+(qi+1)+'. '+item.q+'</p>';
+ item.a.forEach(function(opt,oi){h+='<button class="opt" data-q="'+qi+'" data-o="'+oi+'">'+opt+'</button>';});
+ h+='<p class="exp" id="exp'+qi+'" style="display:none">'+item.e+'</p>';
+ d.innerHTML=h;qb.appendChild(d);
+});
+qb.addEventListener('click',function(e){
+ var b=e.target.closest('.opt');if(!b)return;
+ var qi=+b.dataset.q,oi=+b.dataset.o;
+ if(answered[qi]!==undefined)return;
+ answered[qi]=oi===QUIZ[qi].c;
+ qb.querySelectorAll('.opt[data-q="'+qi+'"]').forEach(function(x){
+  var o=+x.dataset.o;
+  if(o===QUIZ[qi].c)x.classList.add('right');
+  else if(o===oi)x.classList.add('wrong');
+ });
+ document.getElementById('exp'+qi).style.display='block';
+ var keys=Object.keys(answered);
+ if(keys.length===QUIZ.length){
+  var right=keys.filter(function(k){return answered[k]}).length;
+  var box=document.getElementById('quizScore');box.style.display='block';
+  var msg=right===QUIZ.length?'Every one. You could read a charger datasheet now.':(right>=Math.ceil(QUIZ.length*0.7)?'Strong. Revisit the chapters behind the ones you missed.':'Worth another pass through chapters 2 to 9 — the answers above explain each one.');
+  box.innerHTML='<h4 style="margin:0 0 4px">'+right+' of '+QUIZ.length+' correct</h4>'+'<p style="font-family:\'IBM Plex Serif\',serif;margin:0;color:var(--ink-2)">'+msg+'</p>';
+  box.scrollIntoView({block:'nearest'});
+ }
+});
+
+/* ---------- glossary ---------- */
+var GLOSS=[
+ ['APDO','Augmented Power Data Object — the PD message describing a continuously adjustable PPS range rather than a fixed voltage.'],
+ ['CC pin','Configuration Channel. Two pins in a USB-C connector used to detect attachment, decide orientation, and carry Power Delivery messages.'],
+ ['Creepage','The shortest distance along a surface between two conductors. Safety standards set minimums; the routed slot in a charger PCB exists to satisfy them.'],
+ ['CC/CV','Constant current then constant voltage — the two-phase profile every lithium cell is charged with.'],
+ ['Duty cycle','The fraction of each switching period the transistor is on. The controller adjusts it to regulate output voltage.'],
+ ['ESR','Equivalent series resistance. The unwanted resistance inside a capacitor; lower ESR means less heating and less ripple.'],
+ ['Flyback','A converter topology that stores energy in a transformer core during the switch-on period and releases it during switch-off.'],
+ ['GaN','Gallium nitride. A wide-bandgap semiconductor whose transistors switch faster with less loss than silicon, enabling smaller magnetics.'],
+ ['Galvanic isolation','No conductive path between two circuits. In a charger, energy crosses only magnetically and optically.'],
+ ['PDO','Power Data Object — one advertised fixed voltage and current profile.'],
+ ['PPS','Programmable Power Supply. A PD extension allowing output voltage to be requested in 20 mV steps and adjusted continuously.'],
+ ['Ripple','Residual AC variation left on a DC output. Measured in millivolts and a common proxy for build quality.'],
+ ['RMS','Root mean square. The equivalent steady value of an AC waveform; 220 V RMS peaks at about 325 V.'],
+ ['Synchronous rectification','Replacing an output diode with an actively switched MOSFET to cut conduction loss.'],
+ ['Burst mode','A light-load technique where the controller fires a short cluster of switching pulses then sleeps, cutting the fixed per-transition losses that otherwise wreck light-load efficiency.'],
+ ['Charge pump','A switched-capacitor converter that divides voltage by an exact integer ratio while multiplying current. No inductor, so 97–98 % efficiency is achievable.'],
+ ['CCM / DCM','Continuous and discontinuous conduction mode — whether transformer current reaches zero before the next switching cycle begins.'],
+ ['E-marker','A chip inside a USB-C cable plug that declares the cable\'s current, voltage and data ratings. Required for any contract above 3 A.'],
+ ['EPR','Extended Power Range, introduced in PD 3.1: 28, 36 and 48 V profiles reaching 240 W, gated behind e-marked cables.'],
+ ['Loop bandwidth','How fast the regulation loop can correct an error. Too low gives deep transient dips; too high gives overshoot and ringing.'],
+ ['Rp / Rd','The pull-up on the source and pull-down on the sink of a USB-C CC line. Their presence detects attachment and orientation; the pull-up value encodes a default current limit before any PD messages.'],
+ ['Valley switching','Turning the switch on at the minimum of the drain ringing waveform to reduce transition loss.'],
+ ['Y-capacitor','A safety-rated capacitor bridging primary and secondary grounds to give switching noise a return path, built to fail open rather than short.']
+];
+var gb=document.getElementById('glossBox');
+GLOSS.forEach(function(g){gb.innerHTML+='<dt>'+g[0]+'</dt><dd>'+g[1]+'</dd>';});
+</script>
+
+<script>
+/* ---------- ch4 control loop ---------- */
+function ctrlUpd(){
+ var D=+document.getElementById('dSel').value/100, N=+document.getElementById('nSel').value;
+ var vout=300*(D/(1-D))*(1/N);
+ document.getElementById('dOut').textContent=D.toFixed(2);
+ document.getElementById('nOut').textContent='1 : '+N;
+ document.getElementById('dVout').textContent=vout.toFixed(1)+' V';
+ var mode=D>0.48?'CCM':'DCM';
+ document.getElementById('dMode').textContent=mode;
+ document.getElementById('dMode').style.color=mode==='CCM'?'#A9682A':'#1E6B4A';
+ var vsw=300+vout*N;
+ document.getElementById('dStress').textContent=Math.round(vsw)+' V';
+ var n=document.getElementById('dNote');
+ if(D>0.6) n.textContent='Duty cycles this high push reflected voltage onto the switch during off-time, so a 650 V device starts running out of margin. Designers usually cap duty around 0.5 and change the turns ratio instead.';
+ else if(D<0.2) n.textContent='Very low duty means short, tall current pulses: the same average power moved with much higher peak current, which punishes conduction loss and transformer copper.';
+ else n.textContent='A practical operating region. Note that output voltage depends on duty cycle and turns ratio only — not on load — which is exactly why a feedback loop is needed to hold it steady as load changes.';
+}
+['dSel','nSel'].forEach(function(id){document.getElementById(id).addEventListener('input',ctrlUpd);});
+ctrlUpd();
+
+var lcv=document.getElementById('loopCv'),lcx=lcv.getContext('2d'),lt=-1,lAnim=null;
+function loopSim(){
+ var bw=+document.getElementById('bwSel').value;
+ document.getElementById('bwOut').textContent=bw+' kHz';
+ var zeta=Math.max(0.12,0.95-bw*0.042), wn=bw*1000*6.283;
+ var dip=520/Math.pow(bw,0.75);
+ var W=lcv.width,H=lcv.height,pad=30,V=20,span=0.0012;
+ lcx.clearRect(0,0,W,H);
+ lcx.strokeStyle='#E4E7E2';lcx.lineWidth=1;
+ for(var i=0;i<=4;i++){var y=pad+(H-pad*2)/4*i;lcx.beginPath();lcx.moveTo(pad,y);lcx.lineTo(W-pad,y);lcx.stroke();}
+ lcx.strokeStyle='#BFC5BD';lcx.setLineDash([4,4]);
+ var y0=pad+(H-pad*2)*0.45;lcx.beginPath();lcx.moveTo(pad,y0);lcx.lineTo(W-pad,y0);lcx.stroke();lcx.setLineDash([]);
+ lcx.fillStyle='#7C8785';lcx.font='12px "IBM Plex Mono",monospace';lcx.fillText('20.00 V',4,y0-5);
+ var maxT=lt<0?1:Math.min(1,lt),vsc=Math.min(0.32,78/(dip*1.25));
+ lcx.strokeStyle='#2A5FA8';lcx.lineWidth=2.2;lcx.beginPath();
+ var worst=0,rec=0;
+ for(var px=0;px<=(W-pad*2)*maxT;px++){
+  var t=(px/(W-pad*2))*span;
+  var wd=wn*Math.sqrt(Math.abs(1-zeta*zeta));
+  var dev=-dip*Math.exp(-zeta*wn*t)*Math.sin(wd*t+Math.acos(Math.min(1,zeta)))/Math.sqrt(Math.abs(1-zeta*zeta));
+  if(t<0.000004)dev=-dip*(t/0.000004);
+  if(-dev>worst)worst=-dev;
+  if(Math.abs(dev)>20)rec=t;
+  var y=y0-dev*vsc;
+  px===0?lcx.moveTo(pad+px,y):lcx.lineTo(pad+px,y);
+ }
+ lcx.stroke();
+ lcx.fillStyle='#7C8785';lcx.fillText('0',pad-4,H-12);lcx.fillText('1.2 ms',W-pad-44,H-12);
+ document.getElementById('lUnder').textContent=Math.round(worst)+' mV';
+ document.getElementById('lRec').textContent=Math.round(rec*1e6)+' µs';
+ var v=document.getElementById('lVerd');
+ if(zeta<0.25){v.textContent='ringing';v.style.color='#A8382B';}
+ else if(zeta<0.55){v.textContent='fast, damped';v.style.color='#1E6B4A';}
+ else {v.textContent='slow, safe';v.style.color='#A9682A';}
+}
+document.getElementById('bwSel').addEventListener('input',function(){lt=-1;loopSim();});
+document.getElementById('loopStep').addEventListener('click',function(){
+ clearInterval(lAnim);lt=0;
+ lAnim=setInterval(function(){lt+=0.035;loopSim();if(lt>=1){clearInterval(lAnim);lt=-1;}},22);
+});
+loopSim();
+
+/* ---------- ch6 loss budget ---------- */
+var LOSSK=[
+ {n:'Conduction (switch + windings)',c:'#A8382B',f:function(x){return 0.90*x*x;}},
+ {n:'Switching transitions',c:'#A9682A',f:function(x,b){return 0.75*(b?Math.min(1,0.30+0.70*x):1);}},
+ {n:'Transformer core',c:'#2A5FA8',f:function(x){return 0.45+0.25*x;}},
+ {n:'Synchronous rectifier',c:'#1E6B4A',f:function(x){return 0.60*x*x;}},
+ {n:'Output filter ESR',c:'#7C8785',f:function(x){return 0.12*x*x;}},
+ {n:'Controller and housekeeping',c:'#BFC5BD',f:function(){return 0.06;}}
+];
+function lossAt(p,burst){
+ var x=p/45,tot=0,rows=LOSSK.map(function(k){var v=k.f(x,burst);tot+=v;return{n:k.n,c:k.c,v:v};});
+ return{rows:rows,tot:tot};
+}
+function lossUpd(){
+ var p=+document.getElementById('loadSel').value/10,burst=document.getElementById('burstOn').checked;
+ var r=lossAt(p,burst),eff=p>0?p/(p+r.tot)*100:0;
+ document.getElementById('loadOut').textContent=p.toFixed(1)+' W';
+ document.getElementById('lossTot').textContent=r.tot.toFixed(2)+' W';
+ document.getElementById('lossEff').textContent=(p>0?eff.toFixed(1):'—')+' %';
+ document.getElementById('lossT').textContent=Math.round(r.tot*11)+' K';
+ var max=Math.max(1,r.tot),h='';
+ r.rows.forEach(function(row){
+  h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
+     '<span style="flex:0 0 190px;font-size:12.5px;color:var(--ink-2)">'+row.n+'</span>'+
+     '<span style="flex:1;background:var(--bench);border-radius:3px;height:16px;position:relative;overflow:hidden">'+
+     '<span style="position:absolute;left:0;top:0;bottom:0;width:'+(row.v/max*100)+'%;background:'+row.c+'"></span></span>'+
+     '<span class="mono" style="flex:0 0 58px;text-align:right;font-size:12px">'+row.v.toFixed(2)+' W</span></div>';
+ });
+ document.getElementById('lossBars').innerHTML=h;
+ effCurve(p,burst);
+}
+function effCurve(mark,burst){
+ var c=document.getElementById('effCv'),g=c.getContext('2d'),W=c.width,H=c.height,pad=34;
+ g.clearRect(0,0,W,H);
+ g.strokeStyle='#E4E7E2';g.lineWidth=1;
+ for(var i=0;i<=4;i++){var y=pad+(H-pad*2)/4*i;g.beginPath();g.moveTo(pad,y);g.lineTo(W-pad,y);g.stroke();}
+ g.fillStyle='#7C8785';g.font='12px "IBM Plex Mono",monospace';
+ g.fillText('100%',2,pad+4);g.fillText('60%',10,H-pad+4);g.fillText('45 W',W-pad-34,H-pad+18);g.fillText('0',pad-4,H-pad+18);
+ g.strokeStyle='#1E6B4A';g.lineWidth=2.4;g.beginPath();
+ for(var px=0;px<=W-pad*2;px++){
+  var p=px/(W-pad*2)*45,r=lossAt(p,burst),e=p>0?p/(p+r.tot)*100:60;
+  var y=H-pad-(H-pad*2)*Math.max(0,(e-60)/40);
+  px===0?g.moveTo(pad+px,y):g.lineTo(pad+px,y);
+ }
+ g.stroke();
+ var mr=lossAt(mark,burst),me=mark>0?mark/(mark+mr.tot)*100:60;
+ var mx=pad+(W-pad*2)*(mark/45),my=H-pad-(H-pad*2)*Math.max(0,(me-60)/40);
+ g.fillStyle='#A8382B';g.beginPath();g.arc(mx,my,5,0,6.3);g.fill();
+}
+document.getElementById('loadSel').addEventListener('input',lossUpd);
+document.getElementById('burstOn').addEventListener('change',lossUpd);
+lossUpd();
+
+/* ---------- ch8 pps ---------- */
+var ppsTimer=null;
+function ppsUpd(){
+ var soc=+document.getElementById('socSel').value;
+ var vc=3.40+0.85*Math.pow(soc/100,0.85);
+ var vbRaw=2*vc+0.28, vb=Math.round(vbRaw/0.02)*0.02;
+ document.getElementById('socOut').textContent=soc+' %';
+ document.getElementById('ppsVc').textContent=vc.toFixed(3)+' V';
+ document.getElementById('ppsVb').textContent=vb.toFixed(2)+' V';
+ var icell=soc>80?8.0*(1-(soc-80)/20*0.85):(soc>60?8.0*(1-(soc-60)/20*0.25):8.0);
+ var arch=[
+  {n:'PPS + 2:1 charge pump',v:vb.toFixed(2)+' V',eta:0.975,tag:'direct charge',c:'#1E6B4A'},
+  {n:'Fixed 9 V + internal buck',v:'9.00 V',eta:0.89,tag:'conventional',c:'#A9682A'},
+  {n:'Fixed 5 V + internal buck',v:'5.00 V',eta:0.86,cap:15,tag:'legacy',c:'#A8382B'}
+ ];
+ var h='';
+ arch.forEach(function(a){
+  var pcell=vc*icell, pin=pcell/a.eta;
+  if(a.cap&&pin>a.cap){pin=a.cap;pcell=pin*a.eta;}
+  if(pin>40){pin=40;pcell=pin*a.eta;}
+  var heat=pin-pcell;
+  h+='<div class="card" style="padding:12px 14px;border-left:3px solid '+a.c+';border-radius:0 4px 4px 0">'+
+     '<h4 style="margin:0 0 2px">'+a.n+'</h4>'+
+     '<p class="mono" style="font-size:11px;color:var(--ink-3);margin:0 0 8px">'+a.tag+' · bus '+a.v+'</p>'+
+     '<div class="mono" style="font-size:12.5px;line-height:1.9">into cell <b>'+pcell.toFixed(1)+' W</b><br>'+
+     'heat in phone <b style="color:'+(heat>2?'#A8382B':'#1E6B4A')+'">'+heat.toFixed(2)+' W</b><br>'+
+     'efficiency <b>'+(a.eta*100).toFixed(1)+' %</b></div></div>';
+ });
+ document.getElementById('ppsCards').innerHTML=h;
+ var n=document.getElementById('ppsNote');
+ if(soc>85) n.textContent='Near full charge the cell itself limits current, so all three architectures converge. The advantage of direct charging is spent almost entirely in the first two thirds of the curve.';
+ else if(soc<15) n.textContent='At a deeply discharged cell the required bus voltage is at its lowest — around 7 V — and a fixed 9 V supply wastes the most in conversion. This is where PPS pulls furthest ahead.';
+ else n.textContent='The buck converter dissipates its losses inside the phone, next to the cell. The charge pump moves most of that heat back into the charger, which has a bigger case and no battery in it.';
+}
+document.getElementById('socSel').addEventListener('input',function(){clearInterval(ppsTimer);ppsUpd();});
+document.getElementById('ppsAuto').addEventListener('click',function(){
+ var b=this;clearInterval(ppsTimer);
+ if(b.classList.contains('on')){b.classList.remove('on');return;}
+ b.classList.add('on');
+ var sl=document.getElementById('socSel');sl.value=0;
+ ppsTimer=setInterval(function(){
+  sl.value=+sl.value+1;ppsUpd();
+  if(+sl.value>=100){clearInterval(ppsTimer);b.classList.remove('on');}
+ },90);
+});
+ppsUpd();
+</script>
+</body>
+</html>
